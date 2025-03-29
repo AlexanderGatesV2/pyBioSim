@@ -17,6 +17,12 @@ ENV/
 *.log
 evolution_logs/
 
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+test_results/
+
 # IDE specific files
 .idea/
 .vscode/
@@ -26,3 +32,7 @@ evolution_logs/
 # OS specific files
 .DS_Store
 Thumbs.db
+
+# C++ build artifacts (for comparison testing)
+*.o
+*.out

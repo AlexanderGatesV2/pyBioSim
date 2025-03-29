@@ -1,0 +1,21 @@
+{
+    "population_size": 500,
+    "steps_per_generation": 2000,
+    "max_generations": 50,
+    "sexual_reproduction": true,
+    "challenge": 2,
+    "mutation_rate": 0.002,
+    "genome_initial_length_min": 30,
+    "genome_initial_length_max": 60,
+    "max_number_neurons": 25,
+    "population_sensor_radius": 3.0,
+    "signal_sensor_radius": 3.0,
+    "responsiveness_curve_k_factor": 3,
+    "short_probe_barrier_distance": 5,
+    "barrier_type": 1,
+    "kill_enable": false,
+    "world_size": [
+        300,
+        200
+    ]
+}
