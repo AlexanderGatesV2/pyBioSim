@@ -1,0 +1,6 @@
+include README.md
+include requirements.txt
+include config.json
+include LICENSE
+recursive-include evolution_logs *.csv
+recursive-include evolution_logs *.png
