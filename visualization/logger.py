@@ -57,7 +57,7 @@ class Logger:
                 self.file = None
                 self.writer = None
 
-    def log_generation(self, generation, creatures):
+    def log_generation(self, generation, creatures, murder_count=0):
         """
         Log statistics about the current generation to CSV.
         
@@ -67,6 +67,7 @@ class Logger:
         Args:
             generation: Current generation number
             creatures: List of creatures in the current generation
+            murder_count: Number of creatures killed in this generation
         """
         if not self.params['log_to_csv'] or self.writer is None or not creatures:
             return

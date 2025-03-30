@@ -4,12 +4,14 @@ import pygame
 import logging
 import datetime
 import csv
+import multiprocessing
 
 from utils.logging_config import configure_logging, get_logger, set_logging_level
 from core.params import load_parameters
 from core.grid import Grid
 from core.signals import Signals
 from visualization.interactive_simulator import InteractiveSimulator
+from core.parallel_simulator import ParallelSimulator
 from environment.zones import ZoneManager
 from environment.barriers import BarrierManager
 from visualization.renderer import GridRenderer
@@ -83,7 +85,13 @@ def main():
 
     # Create simulator and connect components
     try:
-        simulator = InteractiveSimulator(params, grid, signals)
+        # Choose simulator based on configuration
+        if params.get('enable_parallelization', False):
+            logging.info("Using parallel simulator with multiprocessing")
+            simulator = ParallelSimulator(params, grid, signals)
+        else:
+            simulator = InteractiveSimulator(params, grid, signals)
+            
         simulator.zone_manager = zone_manager
         simulator.barrier_manager = barrier_manager
         grid.zone_manager = zone_manager  # For reset operations
@@ -91,6 +99,7 @@ def main():
     except Exception as e:
         logging.error("Failed to initialize Simulator", exc_info=True)
         print(f"Failed to initialize Simulator: {e}")
+        pygame.quit()  # Clean up pygame if simulator initialization fails
         return
 
     # Initialize simulation state variables
