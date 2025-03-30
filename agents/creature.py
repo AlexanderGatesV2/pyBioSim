@@ -27,7 +27,7 @@ class Creature:
         self.id = Creature.next_id
         Creature.next_id += 1
 
-        self.genome = genome if genome else Genome(length=params['genome_length'])
+        self.genome = genome if genome else Genome(length=params['genome_length'], params=params) # Pass params
         self.params = params
         self.alive = True
 
@@ -76,7 +76,7 @@ class Creature:
         self.sociality = random_generator.random_float()
 
         # Enhanced sensory capabilities
-        self.longprobe_dist = params.get('longProbeDistance', 16)
+        self.longprobe_dist = params.get('longprobe_dist', 16) # Use python param name
         self.recent_signals = []  # Track recently detected signals
         self.detected_creatures = []  # Track recently detected creatures
 
@@ -86,54 +86,56 @@ class Creature:
 
         # Initialize the neural network (brain)
         self.brain = NeuralNetwork(self.genome, params)
-        
+
         # Store last discrete movement offset (matches C++ lastMoveDir concept)
         self.last_move_offset = (0, 0) # Initialize to no movement
 
     def apply_movement(self, movement_info, grid):
         """
         Apply movement to the creature and update the grid
-        
+
         Args:
             movement_info: Dictionary with movement data from neural network
             grid: The world grid
-            
+
         Returns:
             bool: True if movement was successful, False otherwise
         """
         dx, dy = movement_info['discrete']
-        
+
         if dx == 0 and dy == 0:
+            # print(f"DEBUG Creature {self.id}: No move offset ({dx}, {dy})") # DEBUG
             return False  # No movement
-        
+
         # Apply boundary checks
-        new_x = max(0, min(self.params['world_size'][0] - 1, self.position[0] + dx))
-        new_y = max(0, min(self.params['world_size'][1] - 1, self.position[1] + dy))
-        
+        new_x = max(0, min(self.params['world_size'][0] - 1, int(self.position[0] + dx))) # Ensure int
+        new_y = max(0, min(self.params['world_size'][1] - 1, int(self.position[1] + dy))) # Ensure int
+
         # Check if the target position is a barrier
-        if grid.is_barrier_at(int(new_x), int(new_y)):
-            # Cannot move into a barrier
-            return False
-        
+        if grid.is_barrier_at(new_x, new_y): # Use int coords
+            # print(f"DEBUG Creature {self.id}: Move to ({new_x}, {new_y}) blocked by barrier.") # DEBUG
+            return False # Cannot move into a barrier
+
         # Update direction if provided
         if movement_info['direction_update']:
             self.direction = movement_info['direction_update']
-        
+
         # Queue the movement for processing at the end of the step
         # This prevents race conditions where multiple creatures try to move to the same cell
+        # print(f"DEBUG Creature {self.id}: Queuing move from {self.position} to ({new_x}, {new_y}) with offset ({dx}, {dy})") # DEBUG
         grid.queue_for_move(self.id, (new_x, new_y))
-        
+
         # We'll consider this a successful movement attempt, even though
         # it might be rejected later if the destination is occupied
         # Update stuck detection
         self.last_positions.append(self.position)
         if len(self.last_positions) > self.max_position_history:
             self.last_positions.pop(0)
-        
+
         # Reset stuck counter since we attempted to move
         self.stuck_counter = 0
         return True
-            
+
     def _process_zone_effects(self, zone_type):
         """Process effects of being in different zone types"""
         if zone_type == 1:  # Safe zone
@@ -157,11 +159,14 @@ class Creature:
             elif key == 'attempt_kill' and value and grid is not None and creatures is not None:
                 # Handle kill attempt
                 self._attempt_kill(grid, creatures)
-            else:
-                # Update creature state variables
-                setattr(self, key, value)
-                
-    def update(self, grid, creatures, signals):
+            elif key in ['oscPeriod', 'longprobe_dist', 'responsiveness']: # Check if key is a known attribute
+                 setattr(self, key, value)
+            # else:
+                # Optionally log unknown state updates
+                # logger.warning(f"Unknown state update key: {key}")
+
+
+    def update(self, grid, creatures, signals, sim_step): # Add sim_step parameter
         """Update the creature for one simulation step"""
         if not self.alive:
             return
@@ -175,13 +180,10 @@ class Creature:
 
         # Update creature's zone status and apply zone effects
         self._process_zone_effects(zone_type)
-        
-        # Get sensory inputs based on current environment, passing simStep
-        # We need the global simStep, which is managed by the Simulator class
-        # Let's assume it's passed via params for now, or we modify update signature later
-        sim_step = self.params.get('current_step', self.age) # Use age as fallback if not passed
-        sensory_inputs = self.get_sensory_inputs(grid, creatures, signals, sim_step)
-        
+
+        # Get sensory inputs based on current environment, passing sim_step
+        sensory_inputs = self.get_sensory_inputs(grid, creatures, signals, sim_step) # Use passed sim_step
+
         # Create state dictionary to pass creature context to neural network
         creature_state = {
             'direction': self.direction,
@@ -189,18 +191,19 @@ class Creature:
             'oscPeriod': self.oscPeriod,
             'longprobe_dist': self.longprobe_dist
         }
-        
+
         # Process neural network with enhanced state interaction
+        # Pass sim_step to feed_forward, not age
         action_values, state_updates = self.brain.feed_forward(
-            sensory_inputs, self.age, creature_state)
-        
+            sensory_inputs, sim_step, creature_state)
+
         # Apply neural network state updates
         self._apply_state_updates(state_updates, signals, grid, creatures)
-        
+
         # Process movement using the consolidated logic
         movement_info = self.brain.process_movement(action_values, creature_state)
         self.apply_movement(movement_info, grid)
-        
+
         # Update health and detect environment
         self.update_health()
         self.detect_environment(grid, creatures)
@@ -237,20 +240,21 @@ class Creature:
         # Boundary distance sensors
         if Sensor.BOUNDARY_DIST_X.value < len(sensory_values):
             dist_x_min = min(x, self.params['world_size'][0] - 1 - x)
-            max_x = self.params['world_size'][0] / 2
-            sensory_values[Sensor.BOUNDARY_DIST_X.value] = dist_x_min / max_x
+            max_x = self.params['world_size'][0] / 2.0 # Ensure float division
+            sensory_values[Sensor.BOUNDARY_DIST_X.value] = dist_x_min / max_x if max_x > 0 else 0.0
 
         if Sensor.BOUNDARY_DIST_Y.value < len(sensory_values):
             dist_y_min = min(y, self.params['world_size'][1] - 1 - y)
-            max_y = self.params['world_size'][1] / 2
-            sensory_values[Sensor.BOUNDARY_DIST_Y.value] = dist_y_min / max_y
+            max_y = self.params['world_size'][1] / 2.0 # Ensure float division
+            sensory_values[Sensor.BOUNDARY_DIST_Y.value] = dist_y_min / max_y if max_y > 0 else 0.0
 
         if Sensor.BOUNDARY_DIST.value < len(sensory_values):
             dist_x_min = min(x, self.params['world_size'][0] - 1 - x)
             dist_y_min = min(y, self.params['world_size'][1] - 1 - y)
             closest = min(dist_x_min, dist_y_min)
-            max_possible = max(self.params['world_size'][0] / 2 - 1,
-                               self.params['world_size'][1] / 2 - 1)
+            # Ensure max_possible is at least 1 to avoid division by zero
+            max_possible = max(1.0, self.params['world_size'][0] / 2.0 - 1,
+                               self.params['world_size'][1] / 2.0 - 1)
             sensory_values[Sensor.BOUNDARY_DIST.value] = closest / max_possible
 
         # Last movement direction (use discrete offset)
@@ -265,11 +269,11 @@ class Creature:
         # Long probe sensors (use discrete offset for direction)
         if Sensor.LONGPROBE_POP_FWD.value < len(sensory_values):
             probe_dist = self.get_long_probe_population(grid, last_dx, last_dy)
-            sensory_values[Sensor.LONGPROBE_POP_FWD.value] = probe_dist / self.longprobe_dist
+            sensory_values[Sensor.LONGPROBE_POP_FWD.value] = probe_dist / float(self.longprobe_dist) if self.longprobe_dist > 0 else 0.0
 
         if Sensor.LONGPROBE_BAR_FWD.value < len(sensory_values):
             probe_dist = self.get_long_probe_barrier(grid, last_dx, last_dy)
-            sensory_values[Sensor.LONGPROBE_BAR_FWD.value] = probe_dist / self.longprobe_dist
+            sensory_values[Sensor.LONGPROBE_BAR_FWD.value] = probe_dist / float(self.longprobe_dist) if self.longprobe_dist > 0 else 0.0
 
         # Population density
         if Sensor.POPULATION.value < len(sensory_values):
@@ -300,11 +304,16 @@ class Creature:
 
         # Age
         if Sensor.AGE.value < len(sensory_values):
-            sensory_values[Sensor.AGE.value] = self.age / self.params['max_age']
+             # Ensure max_age is not zero
+            max_age = float(self.params.get('max_age', 1))
+            sensory_values[Sensor.AGE.value] = self.age / max_age if max_age > 0 else 0.0
+
 
         # Oscillator (match C++: use simStep and -cos)
         if Sensor.OSC1.value < len(sensory_values):
-            phase = (sim_step % self.oscPeriod) / float(self.oscPeriod) # Use sim_step
+            # Ensure oscPeriod is not zero
+            osc_period = float(self.oscPeriod) if self.oscPeriod > 0 else 1.0
+            phase = (sim_step % self.oscPeriod) / osc_period # Use sim_step
             factor = -math.cos(phase * 2.0 * math.pi) # Use -cos
             sensor_val = (factor + 1.0) / 2.0 # Convert to 0.0..1.0
             # Clip any round-off error
@@ -313,10 +322,6 @@ class Creature:
         # Random
         if Sensor.RANDOM.value < len(sensory_values):
             sensory_values[Sensor.RANDOM.value] = random.random()
-
-        # Signal (pheromone) sensors
-        if Sensor.SIGNAL0.value < len(sensory_values) and signals is not None:
-            sensory_values[Sensor.SIGNAL0.value] = grid.get_pheromone_level(int(x), int(y))
 
         # Signal (pheromone) sensors (use discrete offset for direction)
         if Sensor.SIGNAL0.value < len(sensory_values) and signals is not None:
@@ -339,21 +344,32 @@ class Creature:
             target_id = int(grid.data[front_x, front_y, 0])
 
             if target_id > 0 and target_id != self.id:
-                for other in creatures:
-                    if other.id == target_id:
-                        similarity = calculate_genetic_similarity(self.genome, other.genome)
-                        sensory_values[Sensor.GENETIC_SIM_FWD.value] = similarity
-                        break
+                # Find the other creature efficiently
+                other_creature = next((c for c in creatures if c.id == target_id), None)
+                if other_creature:
+                    similarity = calculate_genetic_similarity(self.genome, other_creature.genome)
+                    sensory_values[Sensor.GENETIC_SIM_FWD.value] = similarity
+                else:
+                     sensory_values[Sensor.GENETIC_SIM_FWD.value] = 0.0 # Target creature not found (shouldn't happen if grid is consistent)
             else:
                 sensory_values[Sensor.GENETIC_SIM_FWD.value] = 0.0
 
         # Removed Python-specific sensors: SAFE_ZONE, HAZARD_ZONE, RADIATION
         # Ensure Sensor enum and num_sensory_neurons match C++
 
+        # Final check for NaN or out-of-range values
+        if np.any(np.isnan(sensory_values)) or np.any(sensory_values < -0.01) or np.any(sensory_values > 1.01):
+            logger.warning(f"Sensor values out of range or NaN for creature {self.id}: {sensory_values}")
+            sensory_values = np.clip(sensory_values, 0.0, 1.0) # Clip to valid range [0, 1]
+
         return sensory_values
 
     def get_long_probe_population(self, grid, dx, dy):
         """Get distance to nearest creature in the forward direction"""
+        # Handle zero direction vector
+        if dx == 0 and dy == 0:
+            return float(self.longprobe_dist)
+
         max_dist = self.longprobe_dist
         x, y = self.position
 
@@ -361,20 +377,27 @@ class Creature:
             probe_x = min(self.params['world_size'][0] - 1, max(0, int(x + dx * d)))
             probe_y = min(self.params['world_size'][1] - 1, max(0, int(y + dy * d)))
 
-            if probe_x == int(x) and probe_y == int(y):
-                # No movement in this direction
-                break
-
+            # Stop if probe hits barrier or another creature
+            if grid.is_barrier_at(probe_x, probe_y):
+                 return float(max_dist) # C++ returns max distance if barrier hit
             if grid.data[probe_x, probe_y, 0] > 0:  # Found a creature
-                return d
+                return float(d)
 
-            if d == max_dist:  # Reached max distance without finding creature
-                return max_dist
+            # Stop if probe hits world boundary (implicit barrier)
+            if probe_x == 0 or probe_x == self.params['world_size'][0] - 1 or \
+               probe_y == 0 or probe_y == self.params['world_size'][1] - 1:
+                 if d < max_dist: # Only return max_dist if boundary hit before max probe distance
+                     return float(max_dist)
 
-        return max_dist
+
+        return float(max_dist) # Reached max distance
 
     def get_long_probe_barrier(self, grid, dx, dy):
         """Get distance to nearest barrier in the forward direction"""
+         # Handle zero direction vector
+        if dx == 0 and dy == 0:
+            return float(self.longprobe_dist)
+
         max_dist = self.longprobe_dist
         x, y = self.position
 
@@ -382,38 +405,38 @@ class Creature:
             probe_x = min(self.params['world_size'][0] - 1, max(0, int(x + dx * d)))
             probe_y = min(self.params['world_size'][1] - 1, max(0, int(y + dy * d)))
 
-            if probe_x == int(x) and probe_y == int(y):
-                # No movement in this direction
-                break
-
             if grid.is_barrier_at(probe_x, probe_y):  # Found a barrier
-                return d
+                return float(d)
 
-            if d == max_dist:  # Reached max distance without finding barrier
-                return max_dist
+            # Stop if probe hits world boundary
+            if probe_x == 0 or probe_x == self.params['world_size'][0] - 1 or \
+               probe_y == 0 or probe_y == self.params['world_size'][1] - 1:
+                 if d < max_dist: # C++ returns max distance if boundary hit before max probe distance
+                     return float(max_dist)
 
-        return max_dist
+
+        return float(max_dist) # Reached max distance
 
     def get_population_density(self, grid):
         """Get local population density in neighborhood"""
-        radius = self.params.get('populationSensorRadius', 2.5)
+        radius = self.params.get('population_sensor_radius', 2.5) # Use Python param name
         x, y = self.position
 
-        count = 0
-        total = 0
+        count_occupied = 0
+        count_locs = 0
 
-        for dx in range(-int(radius), int(radius) + 1):
-            for dy in range(-int(radius), int(radius) + 1):
-                dist = dx * dx + dy * dy
-                if dist <= radius * radius:  # Within circular radius
-                    nx = min(self.params['world_size'][0] - 1, max(0, int(x + dx)))
-                    ny = min(self.params['world_size'][1] - 1, max(0, int(y + dy)))
+        # Use grid's visit_neighborhood
+        def visit_callback(loc):
+            nonlocal count_occupied, count_locs
+            tloc_x, tloc_y = loc
+            count_locs += 1
+            if grid.isOccupiedAt(tloc_x, tloc_y):
+                 count_occupied += 1
 
-                    if grid.data[nx, ny, 0] > 0:  # Contains a creature
-                        count += 1
-                    total += 1
+        grid.visit_neighborhood((int(x), int(y)), radius, visit_callback)
 
-        return count / total if total > 0 else 0
+        return float(count_occupied) / count_locs if count_locs > 0 else 0.0
+
 
     def get_population_density_axis(self, grid, direction):
         """Get population density gradient along an axis, matching C++"""
@@ -437,11 +460,12 @@ class Creature:
         def visit_callback(loc):
             nonlocal sum_val
             tloc_x, tloc_y = loc
-            if (tloc_x, tloc_y) != (int(x), int(y)) and grid.isOccupiedAt(tloc_x, tloc_y):
-                offset_x = tloc_x - x
-                offset_y = tloc_y - y
+            # C++ includes the center location in the neighborhood check but excludes it from the sum calculation
+            if grid.isOccupiedAt(tloc_x, tloc_y) and (tloc_x, tloc_y) != (int(x), int(y)):
+                offset_x = float(tloc_x - x)
+                offset_y = float(tloc_y - y)
                 dist_sq = offset_x * offset_x + offset_y * offset_y
-                if dist_sq > 0: # Avoid division by zero
+                if dist_sq > 1e-6: # Avoid division by zero or near-zero
                     # Projection magnitude along the direction axis
                     proj = dir_vec_x * offset_x + dir_vec_y * offset_y
                     # C++ calculation: proj / dist_sq
@@ -452,7 +476,7 @@ class Creature:
 
         # C++ normalization
         max_sum_mag = 6.0 * radius
-        if max_sum_mag == 0: return 0.5 # Avoid division by zero
+        if max_sum_mag < 1e-6: return 0.5 # Avoid division by zero
 
         sensor_val = sum_val / max_sum_mag # convert to approx -1.0..1.0
         sensor_val = (sensor_val + 1.0) / 2.0 # convert to 0.0..1.0
@@ -463,7 +487,11 @@ class Creature:
     def get_short_probe_barrier(self, grid, direction):
         """Get barrier distance along an axis (forward and reverse)"""
         dx, dy = direction
-        probe_distance = self.params.get('shortProbeBarrierDistance', 4)
+        # Handle zero direction vector
+        if dx == 0 and dy == 0:
+            return 0.5 # Return mid-range if no direction
+
+        probe_distance = self.params.get('short_probe_barrier_distance', 4) # Use Python param name
         x, y = self.position
 
         # Search forward
@@ -475,10 +503,12 @@ class Creature:
             if grid.is_barrier_at(nx, ny):
                 break
             forward_dist += 1
-
+            # C++ logic: if boundary hit before probe distance, count as max distance
             if nx == 0 or nx == self.params['world_size'][0] - 1 or ny == 0 or ny == self.params['world_size'][1] - 1:
-                forward_dist = probe_distance
-                break
+                 if d < probe_distance:
+                     forward_dist = probe_distance
+                     break
+
 
         # Search backward
         backward_dist = 0
@@ -489,38 +519,45 @@ class Creature:
             if grid.is_barrier_at(nx, ny):
                 break
             backward_dist += 1
-
+            # C++ logic: if boundary hit before probe distance, count as max distance
             if nx == 0 or nx == self.params['world_size'][0] - 1 or ny == 0 or ny == self.params['world_size'][1] - 1:
-                backward_dist = probe_distance
-                break
+                 if d < probe_distance:
+                     backward_dist = probe_distance
+                     break
+
 
         # Normalize to range 0..1 based on forward-backward gradient
-        return ((forward_dist - backward_dist) + probe_distance) / (2.0 * probe_distance)
+        denominator = 2.0 * probe_distance
+        if denominator == 0: return 0.5 # Avoid division by zero
+        sensor_val = ((forward_dist - backward_dist) + probe_distance) / denominator
+        return max(0.0, min(1.0, sensor_val)) # Clip
 
     def get_signal_density(self, signals, layer_num, grid):
         """Get signal density in the neighborhood, matching C++"""
         radius = self.params.get('signal_sensor_radius', 2.5) # Use Python param name
         x, y = self.position
-        
+
         count_locs = 0
         signal_sum = 0.0
-        
+
         # Use grid's visit_neighborhood
         def visit_callback(loc):
             nonlocal count_locs, signal_sum
             tloc_x, tloc_y = loc
             count_locs += 1
-            signal_sum += signals.get_value(layer_num, tloc_x, tloc_y) # Assumes signals.get_value exists
+            # C++ uses uint8_t (0-255), Python uses float (0.0-1.0)
+            # We assume signals.get_value returns 0.0-1.0
+            signal_sum += signals.get_value(layer_num, tloc_x, tloc_y)
 
         grid.visit_neighborhood((int(x), int(y)), radius, visit_callback)
-        
+
         if count_locs == 0: return 0.0
-        
+
         # C++ normalization: sum / (countLocs * SIGNAL_MAX)
-        # Assuming SIGNAL_MAX is 1.0 for Python float signals
+        # Python uses float 0.0-1.0, so SIGNAL_MAX equivalent is 1.0
         max_signal_sum = float(count_locs) * 1.0
         if max_signal_sum == 0: return 0.0
-        
+
         sensor_val = signal_sum / max_signal_sum # convert to 0.0..1.0
         return max(0.0, min(1.0, sensor_val)) # Clip
 
@@ -536,7 +573,7 @@ class Creature:
 
         # Normalize the direction vector
         dir_len = math.sqrt(dx * dx + dy * dy)
-        if dir_len == 0: return 0.5
+        if dir_len < 1e-6: return 0.5 # Avoid division by zero if vector is tiny
         dir_vec_x = dx / dir_len
         dir_vec_y = dy / dir_len
 
@@ -546,14 +583,16 @@ class Creature:
         def visit_callback(loc):
             nonlocal sum_val
             tloc_x, tloc_y = loc
+            # C++ includes center, but excludes from sum calculation below
             if (tloc_x, tloc_y) != (int(x), int(y)):
-                offset_x = tloc_x - x
-                offset_y = tloc_y - y
+                offset_x = float(tloc_x - x)
+                offset_y = float(tloc_y - y)
                 dist_sq = offset_x * offset_x + offset_y * offset_y
-                if dist_sq > 0:
+                if dist_sq > 1e-6: # Avoid division by zero
                     # Projection magnitude along the direction axis
                     proj = dir_vec_x * offset_x + dir_vec_y * offset_y
                     # C++ calculation: (proj * signal_magnitude) / dist_sq
+                    # Python uses float 0.0-1.0 for signals
                     signal_magnitude = signals.get_value(layer_num, tloc_x, tloc_y)
                     contrib = (proj * signal_magnitude) / dist_sq
                     sum_val += contrib
@@ -561,9 +600,9 @@ class Creature:
         grid.visit_neighborhood((int(x), int(y)), radius, visit_callback)
 
         # C++ normalization
-        # Assuming SIGNAL_MAX is 1.0 for Python float signals
+        # Python uses float 0.0-1.0, so SIGNAL_MAX equivalent is 1.0
         max_sum_mag = 6.0 * radius * 1.0
-        if max_sum_mag == 0: return 0.5
+        if max_sum_mag < 1e-6: return 0.5 # Avoid division by zero
 
         sensor_val = sum_val / max_sum_mag # convert to approx -1.0..1.0
         sensor_val = (sensor_val + 1.0) / 2.0 # convert to 0.0..1.0

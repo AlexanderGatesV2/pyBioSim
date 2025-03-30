@@ -216,10 +216,12 @@ class Population:
         # Create a dictionary of creatures for quick lookup
         creatures_dict = {creature.id: creature for creature in self.creatures}
         
-        # Update all creatures
-        for creature in self.creatures:
-            if creature.alive and creature.age <= self.params['max_age']:
-                creature.move(grid, self.creatures, signals)
+        # The main creature update logic (sensors, feed-forward, movement queuing)
+        # is now handled in Simulator.update calling creature.update.
+        # This loop is likely redundant and was causing the TypeError.
+        # for creature in self.creatures:
+        #     if creature.alive and creature.age <= self.params['max_age']:
+        #         creature.move(grid, self.creatures, signals)
         
         # Process queued operations
         grid.process_death_queue(creatures_dict)

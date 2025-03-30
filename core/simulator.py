@@ -97,7 +97,8 @@ class Simulator:
         # Update all creatures
         for creature in self.population.creatures:
             if creature.alive:
-                creature.update(self.grid, self.population.creatures, self.signals)
+                # Pass the current simulation step to the creature update
+                creature.update(self.grid, self.population.creatures, self.signals, self.step)
 
         # Debug code to verify creatures are detecting zones
         safe_creatures = sum(1 for c in self.population.creatures if c.in_safe_zone)
@@ -106,9 +107,12 @@ class Simulator:
         # Apply challenge-specific effects
         self._handle_challenge_specific_effects()
 
-        # Process death queue (move queue is now handled in Population.update)
+        # Process death queue
         self.murder_count += len(self.grid.death_queue)
         self.grid.process_death_queue(creatures_dict)
+        
+        # Process move queue
+        self.grid.process_move_queue(creatures_dict) # Add this call back
 
         # Fade pheromones
         for layer in range(self.signals.num_layers):
