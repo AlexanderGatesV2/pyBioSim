@@ -59,8 +59,8 @@ class CustomRenderer:
         border_rect = pygame.Rect(
             self.border_size - 2,  # Offset by 2 pixels to make border visible
             self.border_size - 2,
-            grid_width + 4,  # Add 4 pixels to make border visible on all sides
-            grid_height + 4
+            grid_width + 6,  # Add 4 pixels to make border visible on all sides
+            grid_height + 6
         )
         pygame.draw.rect(screen, (100, 100, 100), border_rect, 2)  # Gray border, 2 pixels thick
         

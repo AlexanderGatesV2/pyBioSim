@@ -226,7 +226,66 @@ class Renderer:
         
         # Font for text
         self.font = pygame.font.SysFont(None, 24)
+        self.title_font = pygame.font.SysFont(None, 28)
+        
+        # Help window
+        self.show_help = False
+        self.instructions_size = (350, 550)
+        self.instructions_window = pygame.Surface(self.instructions_size)
+        self.instructions_window.set_alpha(200)  # Semi-transparent
+        self.instructions_pos = (10, self.display_size[1] - self.instructions_size[1] - 10)
     
+    def render_help_window(self):
+        """Render the help window with instructions"""
+        # Fill window with semi-transparent background
+        self.instructions_window.fill((0, 0, 50))  # Dark blue background
+
+        y_offset = 10
+
+        # Display title
+        title = self.title_font.render("CONTROLS", True, (255, 255, 255))
+        self.instructions_window.blit(title, (10, y_offset))
+        y_offset += 30
+
+        # Basic controls
+        controls = [
+            f"Status: {'PAUSED' if hasattr(self, 'paused') and self.paused else 'RUNNING'}",
+            "SPACE: Pause/Resume simulation",
+            "+/-: Adjust simulation speed",
+            f"Speed: {self.params['fps']} fps",
+            "",
+            "Visual Controls:",
+            "S: Toggle challenge highlighting",
+            f"Challenge highlighting: {'ON' if self.params.get('show_challenge_areas', False) else 'OFF'}",
+            "D: Toggle direction lines",
+            f"Direction lines: {'ON' if self.params.get('show_direction_lines', True) else 'OFF'}",
+            "",
+            "Barrier Types:",
+            "0: No barriers",
+            "1: Vertical bar in center",
+            "2: Vertical bar in random location",
+            "3: Five staggered blocks",
+            f"Current barrier type: {self.params.get('barrierType', 0)}",
+            "",
+            "Generation Control:",
+            "G: Force new generation (when paused)",
+            "R: Reset simulation and delete logs (when paused)",
+            "",
+            "F1: Toggle help display",
+        ]
+
+        for control in controls:
+            if control == "":
+                y_offset += 5  # Less space for separation
+                continue
+
+            control_text = self.font.render(control, True, (200, 200, 200))
+            self.instructions_window.blit(control_text, (10, y_offset))
+            y_offset += 22  # Reduced line spacing
+
+        # Draw the instructions window
+        self.world.blit(self.instructions_window, self.instructions_pos)
+
     def render_world(self, grid, creatures):
         """
         Render the world and all creatures
@@ -290,6 +349,10 @@ class Renderer:
                 f"Challenge: {challenge_name} | Highlighting: {highlight_status}",
                 True, (255, 255, 0))
             self.world.blit(challenge_text, (10, 60))
+            
+        # Show help window if enabled
+        if self.show_help:
+            self.render_help_window()
         
         # Update display
         pygame.display.flip()
@@ -308,18 +371,47 @@ class Renderer:
         Handle pygame events and return if simulation should continue
         
         Returns:
-            Tuple of (running, paused) booleans
+            Tuple of (running, paused, key_events) where key_events is a list of pygame.KEYDOWN events
         """
         running = True
-        paused = True
+        paused = False  # Start with simulation running
+        key_events = []  # List to store key events for simulator to handle
         
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.KEYDOWN:
+                # Store key event for simulator to handle
+                key_events.append(event)
+                
                 if event.key == pygame.K_SPACE:
                     paused = not paused
                 elif event.key == pygame.K_ESCAPE:
                     running = False
+                elif event.key == pygame.K_F1:
+                    # Toggle help display
+                    self.show_help = not self.show_help
+                
+                # Challenge highlighting toggle
+                elif event.key == pygame.K_s:
+                    # Toggle challenge area highlighting
+                    self.params['show_challenge_areas'] = not self.params.get('show_challenge_areas', False)
+                
+                # Direction lines toggle
+                elif event.key == pygame.K_d:
+                    self.params['show_direction_lines'] = not self.params.get('show_direction_lines', True)
+                
+                # Barrier type keys (0-3) - these need to be handled by the simulator
+                # We'll just store the key event and let the simulator handle it
+                # The simulator will call barrier_manager.create_barriers
+                
+                # Simulation speed controls
+                elif event.key == pygame.K_MINUS or event.key == pygame.K_KP_MINUS:
+                    self.params['fps'] = max(10, self.params['fps'] - 30)
+                elif event.key == pygame.K_PLUS or event.key == pygame.K_KP_PLUS or event.key == pygame.K_EQUALS:
+                    self.params['fps'] = min(1000, self.params['fps'] + 30)
         
-        return running, paused
+        # Store paused state for help window display
+        self.paused = paused
+        
+        return running, paused, key_events
