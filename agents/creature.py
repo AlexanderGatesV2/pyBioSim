@@ -173,9 +173,9 @@ class Creature:
             return
 
         # Debug output
-        if self.id == 1:  # Only print for the first creature to avoid flooding
-            pass
-            print(f"DEBUG: Creature {self.id} update called at step {sim_step}, position {self.position}")
+        # if self.id == 1:  # Only print for the first creature to avoid flooding
+        #     pass
+        #     print(f"DEBUG: Creature {self.id} update called at step {sim_step}, position {self.position}")
 
         # Record current position and increment age
         self.age += 1
