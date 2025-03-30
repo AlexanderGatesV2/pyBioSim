@@ -1,10 +1,12 @@
 # pyBioSim
 
-An evolutionary simulation of creatures with neural networks.
+An evolutionary simulation of creatures with neural networks, compatible with biosim4.
 
 ## Description
 
 pyBioSim is a simulation environment where virtual creatures with neural networks evolve over generations. The creatures navigate a 2D world, responding to environmental challenges through their neural networks, which are encoded by genomes that evolve through natural selection.
+
+This project is a Python implementation of the [biosim4](https://github.com/davidrmiller/biosim4) C++ evolutionary simulation, with enhancements for visualization and interactivity.
 
 ## Features
 
@@ -14,6 +16,21 @@ pyBioSim is a simulation environment where virtual creatures with neural network
 - Interactive visualization with pygame
 - Customizable simulation parameters
 - Data logging and analysis tools
+- Compatibility with biosim4 C++ configuration files
+
+## C++ Compatibility
+
+This project is being updated to ensure compatibility with the original C++ biosim4 implementation. The goal is to faithfully recreate the C++ simulation behavior while maintaining the advantages of the Python architecture.
+
+### Compatibility Status
+
+- [ ] Gene and Genome Implementation
+- [ ] Neural Network Implementation
+- [ ] Movement and Sensor Implementation
+- [ ] Survival and Reproduction
+- [ ] Grid and Environment
+- [ ] Integration and Verification
+- [ ] Documentation and Finalization
 
 ## Installation
 
@@ -108,6 +125,17 @@ During simulation:
 ## Configuration
 
 The simulation can be customized through a JSON configuration file. See `config.json` for available parameters.
+
+### C++ Configuration Files
+
+pyBioSim can now read C++ biosim4 .ini configuration files directly:
+
+```bash
+# Run with a C++ biosim4 configuration file
+python main.py --config biosim4.ini
+```
+
+This allows for direct comparison between the C++ and Python implementations using the same configuration.
 
 ## License
 

@@ -11,13 +11,15 @@ logger = get_logger(__name__, log_file='genome_debug.log', console_level=logging
 
 
 class Gene:
-    def __init__(self, hex_value=None):
+    def __init__(self, hex_value=None, params=None):
         """
         Initialize a gene with either a provided hex value or a random one.
 
         Args:
             hex_value (str, optional): Hexadecimal value representing the gene
+            params (dict, optional): Simulation parameters (for weight_divisor)
         """
+        self.params = params if params else {} # Store params
         try:
             # Generate or validate hex value
             if hex_value is None:
@@ -37,7 +39,6 @@ class Gene:
 
             # Parse gene fields
             self._parse_hex_value()
-
 
         except Exception as e:
             logger.error(f"Error initializing Gene: {e}", exc_info=True)
@@ -59,7 +60,8 @@ class Gene:
 
             # Weight conversion with signed integer handling
             weight_bits = binary[16:]
-            weight_divisor = 6000  # Match C++ weight scaling
+            # Use weight_divisor from params, default to C++ value if not found
+            weight_divisor = self.params.get('weight_divisor', 8192.0)
 
             if weight_bits[0] == '1':  # Negative number in two's complement
                 self.weight = (int(weight_bits, 2) - 65536) / weight_divisor
@@ -138,8 +140,8 @@ class Genome:
                 if self.genome_initial_length_min != self.genome_initial_length_max:
                     length = random.randint(self.genome_initial_length_min, self.genome_initial_length_max)
 
-                # Generate genes
-                self.genes = [Gene() for _ in range(length)]
+                # Generate genes, passing params
+                self.genes = [Gene(params=self.params) for _ in range(length)]
 
                 # Enhance gene diversity
                 self.initialize_with_more_diversity()
@@ -185,7 +187,7 @@ class Genome:
 
                     # Insertion mutation
                     elif len(self.genes) < self.genome_max_length:
-                        new_gene = Gene()
+                        new_gene = Gene(params=self.params) # Pass params
                         self.genes.append(new_gene)
                         mutations_applied += 1
                         logger.debug("Inserted new random gene")
@@ -276,8 +278,8 @@ class Genome:
                 primary = other_genome
                 secondary = self
 
-            # Create a copy of the primary parent's genome
-            child_genes = [Gene(gene.hex_value) for gene in primary.genes]
+            # Create a copy of the primary parent's genome, passing params
+            child_genes = [Gene(gene.hex_value, params=self.params) for gene in primary.genes]
 
             # Only apply crossover if the secondary genome has genes
             if secondary.genes:
@@ -294,7 +296,7 @@ class Genome:
                 # Overlay the segment onto the child genome, up to the child's length
                 for i in range(index0, min(index1, len(child_genes))):
                     if i < len(secondary.genes):
-                        child_genes[i] = Gene(secondary.genes[i].hex_value)
+                        child_genes[i] = Gene(secondary.genes[i].hex_value, params=self.params) # Pass params
 
             # Adjust genome length to be the average of the two parents
             target_length = (len(self.genes) + len(other_genome.genes)) // 2
@@ -343,8 +345,8 @@ class Genome:
             # Add missing essential action connections if there are genome slots available
             if missing_actions and len(self.genes) < self.genome_max_length:
                 for action in missing_actions:
-                    # Create a new gene for this action
-                    new_gene = Gene()
+                    # Create a new gene for this action, passing params
+                    new_gene = Gene(params=self.params)
 
                     # Configure the gene for basic movement
                     new_gene.sink_type = 1  # ACTION

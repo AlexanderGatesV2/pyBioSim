@@ -180,10 +180,13 @@ class NeuralNetwork:
                 'output': 0.5,  # Initial output value
                 'driven': neuron_has_external_input[original_idx]
             })
+        # print(f"DEBUG: Final neurons list (len={len(self.neurons)}): {self.neurons}") # DEBUG
+        # print(f"DEBUG: Final connections list (len={len(self.connections)}): {self.connections}") # DEBUG
+
 
     def feed_forward(self, sensory_inputs, sim_step, creature_state=None):
         """
-        Perform neural network feed-forward processing with enhanced movement mechanics
+        Perform neural network feed-forward processing, matching C++ implementation.
 
         Args:
             sensory_inputs: Array of sensor values
@@ -211,7 +214,13 @@ class NeuralNetwork:
         neuron_outputs_computed = False
 
         # Process connections in the correct order (matching C++ ordering)
-        for conn in self.connections:
+        # print(f"DEBUG: Starting feed_forward for genome {self.genome.hash()[:16]}...") # DEBUG
+        # print(f"DEBUG: Initial neuron outputs: {[n['output'] for n in self.neurons]}") # DEBUG
+        
+        action_accumulators = np.zeros(self.params['num_output_neurons']) # Accumulate action inputs separately
+
+        for conn_idx, conn in enumerate(self.connections):
+            # print(f"DEBUG: Processing connection {conn_idx}: {conn}") # DEBUG
             # Process connections to neurons first
             if conn['sink_type'] == 0 and not neuron_outputs_computed:  # NEURON
                 # Get input value from sensor or neuron
@@ -221,17 +230,25 @@ class NeuralNetwork:
                     input_val = self.neurons[conn['source_num']]['output']
 
                 # Add weighted input to neuron accumulator
-                neuron_inputs[conn['sink_num']] += input_val * conn['weight']
+                # Use the pre-scaled float weight stored in the connection
+                weight_float = conn['weight']
+                delta = input_val * weight_float
+                # print(f"DEBUG: Updating neuron_inputs[{conn['sink_num']}] += {delta} (input={input_val}, weight_float={weight_float})") # DEBUG
+                neuron_inputs[conn['sink_num']] += delta
+                # print(f"DEBUG: neuron_inputs[{conn['sink_num']}] is now {neuron_inputs[conn['sink_num']]}") # DEBUG
 
             # When we encounter the first action connection, compute all neuron outputs
             elif conn['sink_type'] == 1 and not neuron_outputs_computed:  # First ACTION connection
+                # print("DEBUG: Computing neuron outputs...") # DEBUG
                 # Update all neuron outputs with tanh activation (exactly matching C++)
                 for i in range(len(self.neurons)):
                     if self.neurons[i]['driven']:
                         self.neurons[i]['output'] = math.tanh(neuron_inputs[i])
+                        # print(f"DEBUG: Neuron {i} output = tanh({neuron_inputs[i]}) = {self.neurons[i]['output']}") # DEBUG
                     # Note: undriven neurons maintain their value from initialization
 
                 neuron_outputs_computed = True
+                # print(f"DEBUG: Computed neuron outputs: {[n['output'] for n in self.neurons]}") # DEBUG
 
                 # Now process this connection (fall through to the action processing)
                 if conn['source_type'] == 0:  # SENSOR
@@ -240,7 +257,11 @@ class NeuralNetwork:
                     input_val = self.neurons[conn['source_num']]['output']
 
                 # Add weighted input to action value
-                action_values[conn['sink_num']] += input_val * conn['weight']
+                # Use the pre-scaled float weight stored in the connection
+                weight_float = conn['weight']
+                action_accumulators[conn['sink_num']] += input_val * weight_float
+                # print(f"DEBUG: Action {conn['sink_num']} input += {input_val} * {weight_float} = {input_val * weight_float}. New total: {action_accumulators[conn['sink_num']]}") # DEBUG
+
 
             # Process remaining action connections
             elif conn['sink_type'] == 1:  # ACTION
@@ -251,11 +272,27 @@ class NeuralNetwork:
                     input_val = self.neurons[conn['source_num']]['output']
 
                 # Add weighted input to action value
-                action_values[conn['sink_num']] += input_val * conn['weight']
+                # Use the pre-scaled float weight stored in the connection
+                weight_float = conn['weight']
+                action_accumulators[conn['sink_num']] += input_val * weight_float
+                # print(f"DEBUG: Action {conn['sink_num']} input += {input_val} * {weight_float} = {input_val * weight_float}. New total: {action_accumulators[conn['sink_num']]}") # DEBUG
+
+
+        # If there were no action connections, compute neuron outputs now
+        if not neuron_outputs_computed:
+            # print("DEBUG: Computing neuron outputs (no action connections found)...") # DEBUG
+            for i in range(len(self.neurons)):
+                if self.neurons[i]['driven']:
+                    self.neurons[i]['output'] = math.tanh(neuron_inputs[i])
+                    # print(f"DEBUG: Neuron {i} output = tanh({neuron_inputs[i]}) = {self.neurons[i]['output']}") # DEBUG
+            # print(f"DEBUG: Computed neuron outputs: {[n['output'] for n in self.neurons]}") # DEBUG
+
 
         # Apply tanh activation and scale to 0..1 range for action values
+        # This matches the C++ implementation in executeActions.cpp
+        # print(f"DEBUG: Action accumulators before tanh: {action_accumulators}") # DEBUG
         for i in range(len(action_values)):
-            action_values[i] = (math.tanh(action_values[i]) + 1.0) / 2.0
+            action_values[i] = (math.tanh(action_accumulators[i]) + 1.0) / 2.0 # Use accumulators
 
         # Process specialized movement actions (matching C++ executeActions.cpp)
         state_updates = self._post_process_actions(action_values, creature_state)
@@ -362,6 +399,20 @@ class NeuralNetwork:
 
         # Add other special action processing as needed
 
+        # Process kill forward action with probabilistic execution
+        # Match C++ threshold and probability calculation
+        if Action.KILL_FORWARD.value < len(action_values):
+            kill_threshold = 0.5  # Same as C++
+            level = action_values[Action.KILL_FORWARD.value]
+            level *= adjusted_responsiveness
+
+            # C++ uses: prob2bool((level - ACTION_MIN) / ACTION_RANGE)
+            # Assuming ACTION_MIN=0.0, ACTION_MAX=1.0, ACTION_RANGE=1.0
+            if level > kill_threshold and random.random() < level:
+                state_updates['attempt_kill'] = True
+
+        # Add other special action processing as needed
+
         return state_updates
 
     def _apply_responsiveness_curve(self, r):
@@ -369,7 +420,7 @@ class NeuralNetwork:
         Apply the responsiveness curve from C++ implementation
         that reduces activity level (makes creatures less jittery)
         """
-        k = self.params.get('responsivenessCurveKFactor', 2)
+        k = self.params.get('responsiveness_curve_k_factor', 2) # Use Python parameter name
         # Direct translation of the C++ implementation
         return math.pow((r - 2.0), -2.0 * k) - math.pow(2.0, -2.0 * k) * (1.0 - r)
 
