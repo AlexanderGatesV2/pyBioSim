@@ -47,7 +47,8 @@ def main():
     # Initialize simulation components
     try:
         grid = Grid(params['world_size'])
-        signals = Signals(params['world_size'], params['signal_layers'])
+        # Pass params to Signals constructor
+        signals = Signals(params['world_size'], params['signal_layers'], params=params)
         zone_manager = ZoneManager(grid, params)
         barrier_manager = BarrierManager(grid, params)
         logging.info("Grid, Signals, ZoneManager, and BarrierManager initialized.")

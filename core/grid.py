@@ -331,15 +331,19 @@ class Grid:
             if self.data[old_x, old_y, 0] == creature_id:
                 self.data[old_x, old_y, 0] = 0
             
-            # Update creature position
-            creature.position = new_pos
+            # Calculate discrete move offset
+            dx = new_x - old_x
+            dy = new_y - old_y
             
-            # Calculate move direction for creature's internal state
-            dx = new_pos[0] - old_x
-            dy = new_pos[1] - old_y
+            # Update creature position and last move offset
+            creature.position = new_pos
+            creature.last_move_offset = (dx, dy) # Store the discrete offset
+            
+            # Update continuous direction if movement occurred
             if dx != 0 or dy != 0:
                 magnitude = math.sqrt(dx * dx + dy * dy)
                 if magnitude > 0:
+                    # Keep internal direction normalized
                     creature.direction = (dx / magnitude, dy / magnitude)
             
             # Set new position in grid

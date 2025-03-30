@@ -30,7 +30,7 @@ DEFAULT_PARAMS = {
     'show_pheromones': True,  # Toggle to show/hide pheromone trails
     'show_challenge_areas': False,  # Toggle to show/hide challenge area highlighting
     'challenge_highlight_transparency': 40,  # Transparency level for challenge area highlighting (0-255)
-    'num_sensory_neurons': 24,  # Match C++ NUM_SENSES
+    'num_sensory_neurons': 21,  # Match C++ NUM_SENSES (index 0-20)
     'num_internal_neurons': 20,  # Match C++ maxNumberNeurons
     'num_output_neurons': 17,  # Match C++ NUM_ACTIONS
     'responsiveness_curve_k_factor': 2,  # Match C++ responsivenessCurveKFactor

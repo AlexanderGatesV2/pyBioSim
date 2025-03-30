@@ -29,7 +29,8 @@ class Simulator:
         """
         self.params = params
         self.grid = grid
-        self.signals = signals
+        # Pass params to Signals constructor
+        self.signals = Signals(params['world_size'], params['signal_layers'], params=params)
 
         # Create components
         self.population = Population(params['population_size'], params)
