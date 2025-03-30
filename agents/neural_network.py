@@ -447,11 +447,13 @@ class NeuralNetwork:
         
         # Apply responsiveness
         adjusted_responsiveness = self._apply_responsiveness_curve(responsiveness)
-        move_x *= adjusted_responsiveness
-        move_y *= adjusted_responsiveness
+        move_x_final = move_x * adjusted_responsiveness
+        move_y_final = move_y * adjusted_responsiveness
         
         # Convert to discrete grid movement
-        dx, dy = self._convert_to_discrete_movement(move_x, move_y)
+        dx, dy = self._convert_to_discrete_movement(move_x_final, move_y_final)
+        
+        # print(f"DEBUG NN Move: raw=({move_x:.3f}, {move_y:.3f}), resp={responsiveness:.3f}, adj_resp={adjusted_responsiveness:.3f}, final=({move_x_final:.3f}, {move_y_final:.3f}), discrete=({dx}, {dy})") # DEBUG
         
         # Calculate new direction if movement occurs
         new_direction = None

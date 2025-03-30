@@ -85,6 +85,18 @@ class Grid:
             Boolean: True if the cell is empty
         """
         return self.data[int(x), int(y), 0] == 0
+        
+    def isOccupiedAt(self, x, y):
+        """
+        Check if a cell is occupied by a creature.
+        
+        Args:
+            x, y: Coordinates to check
+            
+        Returns:
+            Boolean: True if the cell is occupied by a creature
+        """
+        return self.data[int(x), int(y), 0] > 0
 
     def is_barrier_at(self, x, y):
         """
