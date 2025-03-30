@@ -29,7 +29,7 @@ class Simulator:
         """
         self.params = params
         self.grid = grid
-        self.signals = signals
+        self.signals = signals  # Use the signals object passed in
 
         # Create components
         self.population = Population(params['population_size'], params)
@@ -96,18 +96,22 @@ class Simulator:
         # Update all creatures
         for creature in self.population.creatures:
             if creature.alive:
-                creature.update(self.grid, self.population.creatures, self.signals)
+                # Pass the current simulation step to the creature update
+                creature.update(self.grid, self.population.creatures, self.signals, self.step)
 
         # Debug code to verify creatures are detecting zones
         safe_creatures = sum(1 for c in self.population.creatures if c.in_safe_zone)
-        print(f"Safe creatures: {safe_creatures}/{len(self.population.creatures)}")
+        # print(f"Safe creatures: {safe_creatures}/{len(self.population.creatures)}")
 
         # Apply challenge-specific effects
         self._handle_challenge_specific_effects()
 
-        # Process death queue (move queue is now handled in Population.update)
+        # Process death queue
         self.murder_count += len(self.grid.death_queue)
         self.grid.process_death_queue(creatures_dict)
+        
+        # Process move queue
+        self.grid.process_move_queue(creatures_dict) # Add this call back
 
         # Fade pheromones
         for layer in range(self.signals.num_layers):
@@ -293,7 +297,7 @@ class Simulator:
         """
         # If no survivors, restart with random genomes
         if not survivors:
-            print(f"Generation {self.generation}: No survivors, restarting with random genomes")
+            # print(f"Generation {self.generation}: No survivors, restarting with random genomes")
             new_creatures = []
             for _ in range(self.params['population_size']):
                 new_genome = Genome(length=self.params['genome_length'], params=self.params)
@@ -301,7 +305,7 @@ class Simulator:
                 new_creatures.append(new_creature)
             return new_creatures
 
-        print(f"Generation {self.generation}: {len(survivors)} survivors")
+        # print(f"Generation {self.generation}: {len(survivors)} survivors")
 
         # Create new generation from survivors
         new_creatures = []
@@ -406,30 +410,30 @@ class Simulator:
         display_count = min(count, len(self.population.creatures))
         displayed = 0
 
-        print("\n---------------------------")
-        print(f"Sample Genomes (Generation {self.generation})")
-        print("---------------------------")
+        # print("\n---------------------------")
+        # print(f"Sample Genomes (Generation {self.generation})")
+        # print("---------------------------")
 
         for creature in self.population.creatures:
             if displayed >= display_count:
                 break
 
             if creature.alive:
-                print(f"Creature ID: {creature.id}")
-                print(f"Position: {creature.position}")
-                print(f"Energy: {creature.energy:.2f}")
-                print(f"Neural Network: {creature.brain.active_internal_neurons} neurons, "
-                      f"{creature.brain.total_connections} connections")
+                # print(f"Creature ID: {creature.id}")
+                # print(f"Position: {creature.position}")
+                # print(f"Energy: {creature.energy:.2f}")
+                # print(f"Neural Network: {creature.brain.active_internal_neurons} neurons, "
+                #       f"{creature.brain.total_connections} connections")
 
                 # Add a few genes for reference
                 num_genes = min(5, len(creature.genome.genes))
-                print(f"Sample Genes ({num_genes} of {len(creature.genome.genes)}):")
+                # print(f"Sample Genes ({num_genes} of {len(creature.genome.genes)}):")
                 for i in range(num_genes):
                     gene = creature.genome.genes[i]
-                    print(f"  {gene.hex_value}: {gene.source_type}->{gene.source_id} to "
-                          f"{gene.sink_type}->{gene.sink_id} (w={gene.weight:.3f})")
+                    # print(f"  {gene.hex_value}: {gene.source_type}->{gene.source_id} to "
+                    #       f"{gene.sink_type}->{gene.sink_id} (w={gene.weight:.3f})")
 
-                print("---------------------------")
+                # print("---------------------------")
                 displayed += 1
 
         # Display sensor/action usage statistics
@@ -456,20 +460,20 @@ class Simulator:
                         action_counts[conn['sink_num']] += 1
 
         # Print sensor usage
-        print("Sensors in use:")
+        # print("Sensors in use:")
         for sensor_id, count in sorted(sensor_counts.items(), key=lambda x: x[1], reverse=True):
             if count > 0:
                 sensor_name = self._get_sensor_name(sensor_id)
-                print(f"  {count} - {sensor_name}")
+                # print(f"  {count} - {sensor_name}")
 
         # Print action usage
-        print("Actions in use:")
+        # print("Actions in use:")
         for action_id, count in sorted(action_counts.items(), key=lambda x: x[1], reverse=True):
             if count > 0:
                 action_name = self._get_action_name(action_id)
-                print(f"  {count} - {action_name}")
+                # print(f"  {count} - {action_name}")
 
-        print("---------------------------")
+        # print("---------------------------")
 
     def _get_sensor_name(self, sensor_id):
         """Get the name of a sensor from its ID"""

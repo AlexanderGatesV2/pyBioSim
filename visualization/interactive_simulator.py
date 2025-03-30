@@ -161,9 +161,9 @@ class InteractiveSimulator:
         self.population.initialize(self.grid)
 
         # Optional: Print initialization details for debugging
-        print("Simulation reinitialized with preserved configuration")
-        print(f"Population size: {len(self.population.creatures)}")
-        print(f"Grid dimensions: {self.grid.size}")
+        # print("Simulation reinitialized with preserved configuration")
+        # print(f"Population size: {len(self.population.creatures)}")
+        # print(f"Grid dimensions: {self.grid.size}")
 
         # Reset counters
         self.generation = 0
@@ -178,55 +178,55 @@ class InteractiveSimulator:
                 if event.key == pygame.K_SPACE:
                     # Toggle pause
                     self.paused = not self.paused
-                    logger.info(f"Simulation {'paused' if self.paused else 'resumed'}")
+                    # logger.info(f"Simulation {'paused' if self.paused else 'resumed'}")
 
                 # Challenge highlighting toggle
                 elif event.key == pygame.K_s:
                     # Toggle challenge area highlighting
                     self.params['show_challenge_areas'] = not self.params.get('show_challenge_areas', False)
-                    logger.info(f"Challenge area highlighting {'enabled' if self.params['show_challenge_areas'] else 'disabled'}")
+                    # logger.info(f"Challenge area highlighting {'enabled' if self.params['show_challenge_areas'] else 'disabled'}")
                 
                 # Barrier type keys (0-3)
                 elif event.key == pygame.K_0:
                     self.params['barrierType'] = 0
                     self.grid.reset()  # Clear existing barriers
                     self.barrier_manager.create_barriers(0)
-                    logger.info("Barrier type set to 0: None")
+                    # logger.info("Barrier type set to 0: None")
                 elif event.key == pygame.K_1:
                     self.params['barrierType'] = 1
                     self.grid.reset()  # Clear existing barriers
                     self.barrier_manager.create_barriers(1)
-                    logger.info("Barrier type set to 1: Vertical bar in center")
+                    # logger.info("Barrier type set to 1: Vertical bar in center")
                 elif event.key == pygame.K_2:
                     self.params['barrierType'] = 2
                     self.grid.reset()  # Clear existing barriers
                     self.barrier_manager.create_barriers(2)
-                    logger.info("Barrier type set to 2: Vertical bar in random location")
+                    # logger.info("Barrier type set to 2: Vertical bar in random location")
                 elif event.key == pygame.K_3:
                     self.params['barrierType'] = 3
                     self.grid.reset()  # Clear existing barriers
                     self.barrier_manager.create_barriers(3)
-                    logger.info("Barrier type set to 3: Five staggered blocks")
+                    # logger.info("Barrier type set to 3: Five staggered blocks")
 
                 # Simulation speed controls
                 elif event.key == pygame.K_MINUS or event.key == pygame.K_KP_MINUS:
                     self.params['fps'] = max(10, self.params['fps'] - 30)
-                    logger.info(f"Simulation speed decreased to {self.params['fps']} fps")
+                    # logger.info(f"Simulation speed decreased to {self.params['fps']} fps")
                 elif event.key == pygame.K_PLUS or event.key == pygame.K_KP_PLUS or event.key == pygame.K_EQUALS:
                     self.params['fps'] = min(1000, self.params['fps'] + 30)
-                    logger.info(f"Simulation speed increased to {self.params['fps']} fps")
+                    # logger.info(f"Simulation speed increased to {self.params['fps']} fps")
 
                 # Feature toggles
                 elif event.key == pygame.K_F1:
                     self.show_help = not self.show_help
                 elif event.key == pygame.K_d:
                     self.params['show_direction_lines'] = not self.params.get('show_direction_lines', True)
-                    logger.info(f"Direction lines {'enabled' if self.params['show_direction_lines'] else 'disabled'}")
+                    # logger.info(f"Direction lines {'enabled' if self.params['show_direction_lines'] else 'disabled'}")
 
                 # Force new generation
                 elif event.key == pygame.K_g and self.paused:
                     self.step = self.params['steps_per_generation']  # This will trigger a new generation
-                    logger.info("Forced new generation")
+                    # logger.info("Forced new generation")
 
                 # Reset key
                 elif event.key == pygame.K_r and self.paused:
@@ -234,7 +234,7 @@ class InteractiveSimulator:
                     self._delete_log_files()
                     # Re-initialize simulation
                     self.initialize()
-                    logger.info("Simulation reset and log files deleted")
+                    # logger.info("Simulation reset and log files deleted")
 
             # No more mouse events for placing zones
 
@@ -244,13 +244,13 @@ class InteractiveSimulator:
         """Create a zone at the specified position using ZoneManager"""
         # Use the ZoneManager to create the zone
         self.zone_manager.create_zone(pos, self.zone_size, self.zone_type)
-        logger.info(f"Created {'safe' if self.zone_type == 1 else 'hazard'} zone at {pos} with size {self.zone_size}")
+        # logger.info(f"Created {'safe' if self.zone_type == 1 else 'hazard'} zone at {pos} with size {self.zone_size}")
 
     def create_directional_zone(self, direction):
         """Create a directional zone using ZoneManager"""
         # Use the ZoneManager to create the directional zone
         self.zone_manager.create_directional_zone(direction, self.directional_percentage, self.zone_type)
-        logger.info(f"Created {'safe' if self.zone_type == 1 else 'hazard'} directional zone ({direction}) with {self.directional_percentage}%")
+        # logger.info(f"Created {'safe' if self.zone_type == 1 else 'hazard'} directional zone ({direction}) with {self.directional_percentage}%")
         
     def _delete_log_files(self):
         """Delete log files from previous runs"""
@@ -265,18 +265,20 @@ class InteractiveSimulator:
         for file in csv_files:
             try:
                 os.remove(file)
-                logger.info(f"Deleted log file: {file}")
+                # logger.info(f"Deleted log file: {file}")
             except Exception as e:
-                logger.error(f"Failed to delete log file {file}: {e}")
+                # logger.error(f"Failed to delete log file {file}: {e}")
+                pass
         
         # Delete other log files
         log_files = glob.glob("*.log") + glob.glob("*/*.log")
         for file in log_files:
             try:
                 os.remove(file)
-                logger.info(f"Deleted log file: {file}")
+                # logger.info(f"Deleted log file: {file}")
             except Exception as e:
-                logger.error(f"Failed to delete log file {file}: {e}")
+                # logger.error(f"Failed to delete log file {file}: {e}")
+                pass
 
     def render_help_window(self):
         """Render the help window with instructions"""
@@ -345,8 +347,20 @@ class InteractiveSimulator:
         if self.paused:
             return
 
-        # Update all creatures
-        self.population.update(self.grid, self.signals)
+        # Create a dictionary of creatures for quick lookup
+        creatures_dict = {creature.id: creature for creature in self.population.creatures}
+
+        # Update all creatures individually
+        for creature in self.population.creatures:
+            if creature.alive:
+                # Pass the current simulation step to the creature update
+                creature.update(self.grid, self.population.creatures, self.signals, self.step)
+
+        # Process death queue
+        self.grid.process_death_queue(creatures_dict)
+        
+        # Process move queue
+        self.grid.process_move_queue(creatures_dict)
 
         # Update radiation if enabled
         if self.params.get('enable_radioactive_environment', False):

@@ -29,9 +29,9 @@ class Sensor(Enum):
     SIGNAL0 = 18             # Local pheromone concentration
     SIGNAL0_FWD = 19         # Pheromone gradient in forward-backward axis
     SIGNAL0_LR = 20          # Pheromone gradient in left-right axis
-    SAFE_ZONE = 21           # Boolean: creature is in safe zone (0 or 1)
-    HAZARD_ZONE = 22         # Boolean: creature is in hazard zone (0 or 1)
-    RADIATION = 23           # Local radiation level (0-1)
+    # Removed Python-specific sensors: SAFE_ZONE, HAZARD_ZONE, RADIATION
+    # Ensure this enum matches C++ sensors-actions.h up to NUM_SENSES
+    # C++ NUM_SENSES = 21
 
 
 class Action(Enum):

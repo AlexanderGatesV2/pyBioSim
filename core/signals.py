@@ -2,53 +2,72 @@ import numpy as np
 
 
 class Signals:
-    def __init__(self, world_size, num_layers=1):
+    # C++ uses uint8_t (0-255), Python uses float (0.0-1.0)
+    CPP_SIGNAL_MAX = 255.0
+
+    def __init__(self, world_size, num_layers=1, params=None):
         """
         Initialize the pheromone signal layers.
         
         Args:
             world_size: Tuple of (width, height) for the world grid
             num_layers: Number of independent signal layers to create
+            params: Simulation parameters dictionary
         """
         self.size = world_size
         self.num_layers = num_layers
-        self.data = np.zeros((num_layers, world_size[0], world_size[1]))
+        self.data = np.zeros((num_layers, world_size[0], world_size[1]), dtype=float)
+        self.params = params if params else {}
+        
+        # Get scaled parameters matching C++ defaults if available
+        # C++ default signalAmount = 51
+        cpp_signal_amount = self.params.get('signalAmount', 51)
+        self.signal_increment_amount = float(cpp_signal_amount) / self.CPP_SIGNAL_MAX
+        
+        # C++ default fade is decrement by 1
+        self.signal_fade_amount = 1.0 / self.CPP_SIGNAL_MAX
 
-    def increment(self, layer, x, y, amount=0.2):
+    def increment(self, layer, x, y):
         """
-        Increment the signal level at the specified location and its neighbors.
+        Increment the signal level at the specified location and its neighbors,
+        matching C++ logic (add half amount to neighbors).
         
         Args:
             layer: Signal layer index to modify
             x, y: Coordinates where the signal is emitted
-            amount: Amount to increase the signal (default: 0.2)
         """
-        if 0 <= x < self.size[0] and 0 <= y < self.size[1]:
-            # Add to center cell
-            current = self.data[layer, int(x), int(y)]
-            self.data[layer, int(x), int(y)] = min(1.0, current + amount)
+        center_x, center_y = int(x), int(y)
+        amount = self.signal_increment_amount
+        neighbor_amount = amount / 2.0
 
-            # Add to neighboring cells with smaller amount
+        if 0 <= center_x < self.size[0] and 0 <= center_y < self.size[1]:
+            # Add to neighboring cells first (including center)
             for dx in range(-1, 2):
                 for dy in range(-1, 2):
-                    nx, ny = int(x) + dx, int(y) + dy
+                    nx, ny = center_x + dx, center_y + dy
                     if 0 <= nx < self.size[0] and 0 <= ny < self.size[1]:
                         current = self.data[layer, nx, ny]
-                        self.data[layer, nx, ny] = min(1.0, current + (amount / 2))
+                        self.data[layer, nx, ny] = min(1.0, current + neighbor_amount)
+            
+            # Add remaining half to center cell
+            current = self.data[layer, center_x, center_y]
+            self.data[layer, center_x, center_y] = min(1.0, current + neighbor_amount) # Add the other half
 
-    def fade(self, layer, amount=0.002):
+    def fade(self, layer):
         """
         Gradually reduce signal strength across the entire layer.
         
+        Gradually reduce signal strength across the entire layer, matching C++ logic.
+        
         Args:
             layer: Signal layer index to fade
-            amount: Amount to decrease the signal (default: 0.002)
         """
+        amount = self.signal_fade_amount # Use scaled fade amount
         # Subtract from all cells with non-zero values
         mask = self.data[layer] > 0
         self.data[layer][mask] -= amount
         # Ensure no negative values
-        self.data[layer] = np.maximum(0, self.data[layer])
+        self.data[layer] = np.maximum(0.0, self.data[layer])
 
     def get_value(self, layer, x, y):
         """

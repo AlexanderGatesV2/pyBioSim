@@ -3,7 +3,7 @@
 	"display_scale": 6,
 	"genome_length": 24,
 	"mutation_rate": 0.001,
-	"population_size": 1000,
+	"population_size": 10,
 	"steps_per_generation": 300,
 	"fps": 60,
 	"selection_method": "natural",
