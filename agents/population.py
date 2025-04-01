@@ -51,6 +51,9 @@ class Population:
             y = random.randint(0, world_height - 1)
             positions.append((x, y))
 
+        # Track occupied positions to avoid duplicates
+        occupied_positions = set()
+        
         # Create creatures at these positions
         for i in range(min(self.size, len(positions))):
             # Create a genome with higher initial diversity
@@ -64,14 +67,59 @@ class Population:
 
             # If position is already occupied or is a barrier, find a new one
             position = positions[i]
-            if not grid.is_valid_move_target(int(position[0]), int(position[1])):
+            if not grid.is_valid_move_target(int(position[0]), int(position[1])) or (int(position[0]), int(position[1])) in occupied_positions:
                 position = grid.find_empty_location()
+                
+                # Ensure the position is not already occupied
+                attempts = 0
+                while (int(position[0]), int(position[1])) in occupied_positions and attempts < 10:
+                    position = grid.find_empty_location()
+                    attempts += 1
+            
+            # Mark position as occupied
+            occupied_positions.add((int(position[0]), int(position[1])))
 
             creature = Creature(genome=genome, position=position, params=self.params)
             self.creatures.append(creature)
 
             # Register creature in the world grid
             grid.data[int(creature.position[0]), int(creature.position[1]), 0] = creature.id
+            
+        # Verify no duplicates
+        duplicates = []
+        position_counts = {}
+        for creature in self.creatures:
+            pos = (int(creature.position[0]), int(creature.position[1]))
+            if pos in position_counts:
+                position_counts[pos].append(creature.id)
+            else:
+                position_counts[pos] = [creature.id]
+                
+        for pos, creature_ids in position_counts.items():
+            if len(creature_ids) > 1:
+                duplicates.append((pos, creature_ids))
+                
+        if duplicates:
+            print(f"WARNING: Found {len(duplicates)} positions with multiple creatures after initialization:")
+            for pos, creature_ids in duplicates:
+                print(f"  Position {pos} has creatures: {creature_ids}")
+                
+                # Fix duplicates by moving all but one creature to a new position
+                first_creature_id = creature_ids[0]
+                for creature_id in creature_ids[1:]:
+                    for creature in self.creatures:
+                        if creature.id == creature_id:
+                            # Find a new empty location
+                            try:
+                                new_pos = grid.find_empty_location()
+                                # Update grid
+                                grid.data[pos[0], pos[1], 0] = first_creature_id
+                                grid.data[int(new_pos[0]), int(new_pos[1]), 0] = creature_id
+                                # Update creature position
+                                creature.position = new_pos
+                                print(f"    Moved creature {creature_id} to {new_pos}")
+                            except Exception as e:
+                                print(f"    Failed to move creature {creature_id}: {e}")
 
     def natural_selection_tournament(self, grid):
         """

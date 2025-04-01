@@ -298,6 +298,35 @@ class Grid:
         # Clear death queue
         self.death_queue.clear()
 
+    def check_for_duplicates(self):
+        """
+        Check for duplicate creatures in the grid.
+        
+        Returns:
+            List of positions with multiple creatures
+        """
+        # Create a dictionary to track creature counts at each position
+        position_counts = {}
+        
+        # Scan the grid for creatures
+        for x in range(self.size[0]):
+            for y in range(self.size[1]):
+                creature_id = int(self.data[x, y, 0])
+                if creature_id > 0:  # If there's a creature
+                    pos = (x, y)
+                    if pos in position_counts:
+                        position_counts[pos].append(creature_id)
+                    else:
+                        position_counts[pos] = [creature_id]
+        
+        # Find positions with multiple creatures
+        duplicates = []
+        for pos, creature_ids in position_counts.items():
+            if len(creature_ids) > 1:
+                duplicates.append((pos, creature_ids))
+        
+        return duplicates
+    
     def process_move_queue(self, creatures_dict):
         """
         Process all queued movements with conflict resolution.
@@ -311,6 +340,9 @@ class Grid:
         """
         # Randomize the order of moves to avoid bias
         import random
+        import logging
+        logger = logging.getLogger(__name__)
+        
         random.shuffle(self.move_queue)
         
         # Track which positions will be occupied after all moves
@@ -325,6 +357,12 @@ class Grid:
                 
             creature = creatures_dict[creature_id]
             new_x, new_y = int(new_pos[0]), int(new_pos[1])
+            
+            # Double-check if the destination is already occupied
+            current_occupant = self.data[new_x, new_y, 0]
+            if current_occupant > 0 and current_occupant != creature_id:
+                logger.warning(f"Position ({new_x}, {new_y}) already occupied by creature {int(current_occupant)}, cannot move creature {creature_id} there")
+                continue
             
             # Check if destination is valid (empty, not a barrier) and not reserved by another creature
             # Also ensure the destination is not already occupied by another creature

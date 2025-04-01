@@ -140,6 +140,10 @@ class Creature:
         # Check if the target position is a barrier
         if grid.is_barrier_at(new_x, new_y): # Use int coords
             return False # Cannot move into a barrier
+            
+        # Check if the target position is already occupied by another creature
+        if grid.data[new_x, new_y, 0] > 0 and grid.data[new_x, new_y, 0] != self.id:
+            return False # Cannot move into an occupied cell
 
         # Update direction if provided
         if movement_info['direction_update']:
@@ -149,11 +153,10 @@ class Creature:
         # This prevents race conditions where multiple creatures try to move to the same cell
         grid.queue_for_move(self.id, (new_x, new_y))
         
-        # Update the creature's position directly
-        # This is a temporary fix to ensure the creature's position is updated
-        # In the original implementation, this would be done by the grid.process_move_queue method
-        self.position = (new_x, new_y)
-        self.last_move_offset = (dx, dy)
+        # DO NOT update the creature's position directly
+        # This will be done by the grid.process_move_queue method
+        # self.position = (new_x, new_y)
+        # self.last_move_offset = (dx, dy)
 
         # We'll consider this a successful movement attempt, even though
         # it might be rejected later if the destination is occupied
