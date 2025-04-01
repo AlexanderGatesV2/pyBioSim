@@ -17,15 +17,23 @@ def calculate_genetic_similarity(genome1, genome2):
     Returns:
         Float: Similarity score between 0.0 (no similarity) and 1.0 (identical)
     """
-    if len(genome1.genes) != len(genome2.genes):
-        return 0.0
+    len1 = len(genome1.genes)
+    len2 = len(genome2.genes)
+    
+    if len1 == 0 or len2 == 0:
+        return 0.0  # Cannot compare empty genomes
+
+    min_len = min(len1, len2)
+    max_len = max(len1, len2)
 
     matching_genes = 0
-    for i in range(len(genome1.genes)):
+    for i in range(min_len):
         if genome1.genes[i].hex_value == genome2.genes[i].hex_value:
             matching_genes += 1
-
-    return matching_genes / len(genome1.genes)
+            
+    similarity = matching_genes / max_len
+    # print(f"Sim between {genome1.hash()[:5]}... (len {len1}) and {genome2.hash()[:5]}... (len {len2}): {similarity:.3f} ({matching_genes}/{max_len})") # DEBUG
+    return similarity
 
 
 def calculate_genetic_diversity(population):
@@ -62,9 +70,10 @@ def calculate_genetic_diversity(population):
             total_similarity += calculate_genetic_similarity(
                 population[i].genome, population[j].genome)
         average_similarity = total_similarity / num_samples
-
-    # Return diversity (1 - similarity)
-    return 1.0 - average_similarity
+        
+    diversity = 1.0 - average_similarity
+    # print(f"Avg Similarity: {average_similarity:.3f}, Diversity: {diversity:.3f}") # DEBUG
+    return diversity
 
 
 def generate_child_genome(parent1, parent2, mutation_rate=0.01):

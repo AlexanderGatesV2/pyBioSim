@@ -108,12 +108,13 @@ class CreatureRenderer:
                 size = max(scale // 2, 2)
                 
                 # Calculate screen coordinates
-                screen_x = int(creature.position[0] * scale)
-                screen_y = int(creature.position[1] * scale)
+                screen_x = int(creature.position[0] * scale + scale / 2)
+                screen_y = int(creature.position[1] * scale + scale / 2)
                 
-                # Skip rendering if the creature would be partially off-screen
-                if (screen_x - size < 0 or screen_x + size >= screen_width or
-                    screen_y - size < 0 or screen_y + size >= screen_height):
+                # Allow creatures to be rendered even if they're at the edge
+                # Just make sure they're within the grid bounds
+                if (screen_x < 0 or screen_x >= screen_width or
+                    screen_y < 0 or screen_y >= screen_height):
                     continue
                 
                 # Get genome-based color for this creature
@@ -144,8 +145,8 @@ class CreatureRenderer:
                 if params.get('show_direction_lines', True):
                     line_length = params.get('direction_line_length', 1)
                     if line_length > 0:
-                        line_end = (int((creature.position[0] + creature.direction[0] * line_length) * scale),
-                                    int((creature.position[1] + creature.direction[1] * line_length) * scale))
+                        line_end = (int((creature.position[0] + creature.direction[0] * line_length) * scale + scale / 2),
+                                    int((creature.position[1] + creature.direction[1] * line_length) * scale + scale / 2))
                         
                         # Only draw direction line if it's fully on screen
                         if (0 <= line_end[0] < screen_width and 0 <= line_end[1] < screen_height):

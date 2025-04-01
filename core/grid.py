@@ -357,6 +357,11 @@ class Grid:
                 if magnitude > 0:
                     # Keep internal direction normalized
                     creature.direction = (dx / magnitude, dy / magnitude)
+                
+                # Debug information for movement (commented out)
+                # print(f"Creature {creature_id} moved from ({old_x}, {old_y}) to ({new_x}, {new_y})")
+                # print(f"  last_move_offset: {creature.last_move_offset}")
+                # print(f"  direction: {creature.direction}")
             
             # Set new position in grid
             self.data[new_x, new_y, 0] = creature_id

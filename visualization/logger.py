@@ -3,6 +3,7 @@ import csv
 import datetime
 import matplotlib.pyplot as plt
 import numpy as np
+from utils.genetic import calculate_genetic_diversity # Import the function
 
 
 class Logger:
@@ -90,12 +91,8 @@ class Logger:
         connection_counts = [c.brain.total_connections for c in creatures]
         avg_connections = sum(connection_counts) / len(connection_counts) if connection_counts else 0
 
-        # Calculate genetic diversity (number of unique genomes / population size)
-        unique_genomes = set()
-        for creature in creatures:
-            genome_hash = creature.genome.hash()
-            unique_genomes.add(genome_hash)
-        genetic_diversity = len(unique_genomes) / population if population > 0 else 0
+        # Calculate genetic diversity using pairwise similarity
+        genetic_diversity = calculate_genetic_diversity(creatures)
 
         # Count kills
         kills = sum(1 for c in creatures if c.has_killed)

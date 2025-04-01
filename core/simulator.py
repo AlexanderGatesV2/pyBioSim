@@ -93,6 +93,15 @@ class Simulator:
         # Create a dictionary of creatures for quick lookup
         creatures_dict = {creature.id: creature for creature in self.population.creatures}
 
+        # Debug output to verify creatures are alive at the start of the update
+        alive_count = sum(1 for c in self.population.creatures if c.alive)
+        if self.step == 0 or self.step == self.params['steps_per_generation'] - 1:
+            print(f"Step {self.step}: {alive_count} alive creatures at start of update")
+            # Print positions of all creatures
+            for creature in self.population.creatures:
+                if creature.alive:
+                    print(f"Creature {creature.id} at position {creature.position}")
+
         # Update all creatures
         for creature in self.population.creatures:
             if creature.alive:
@@ -121,6 +130,11 @@ class Simulator:
         if self.params.get('enable_radioactive_environment', False):
             self.radiation_manager.update_radiation()
             self.radiation_manager.apply_radiation_effects(self.population.creatures)
+
+        # Debug output to verify creatures are alive at the end of the update
+        alive_count = sum(1 for c in self.population.creatures if c.alive)
+        if self.step == 0 or self.step == self.params['steps_per_generation'] - 1:
+            print(f"Step {self.step}: {alive_count} alive creatures at end of update")
 
         # Increment step counter
         self.step += 1
@@ -203,12 +217,10 @@ class Simulator:
                                                                                                 1) == 0:
             self._display_sample_genomes(self.params['displaySampleGenomes'])
 
-        # Perform natural selection
-        surviving_creatures = self._apply_survival_criteria()
-
-        # Spawn new generation
-        new_creatures = self._spawn_new_generation(surviving_creatures)
-
+        # Use the population's natural selection method to create the next generation
+        # This handles survival criteria, selection, and reproduction
+        new_creatures = self.population.natural_selection_tournament(self.grid)
+        
         # Replace current population with new generation
         self.population.creatures = new_creatures
 
@@ -318,7 +330,7 @@ class Simulator:
         for elite in elites:
             # Clone the genome
             elite_genome = Genome(
-                genes=[Gene(g.hex_value) for g in elite.genome.genes],
+                genes=[Gene(g.hex_value, params=self.params) for g in elite.genome.genes],
                 params=self.params
             )
 

@@ -12,6 +12,7 @@ from core.grid import Grid
 from core.signals import Signals
 from visualization.interactive_simulator import InteractiveSimulator
 from core.parallel_simulator import ParallelSimulator
+from core.enhanced_parallel_simulator import EnhancedParallelSimulator
 from environment.zones import ZoneManager
 from environment.barriers import BarrierManager
 from visualization.renderer import GridRenderer
@@ -19,7 +20,7 @@ from visualization.renderer import GridRenderer
 # Configure default logging
 configure_logging()
 logger = get_logger(__name__)
-logging.getLogger('pygame').setLevel(logging.WARNING)  # Reduce pygame log verbosity
+logging.getLogger('pygame').setLevel(logging.CRITICAL)  # Reduce pygame log verbosity
 
 
 def main():
@@ -87,8 +88,12 @@ def main():
     try:
         # Choose simulator based on configuration
         if params.get('enable_parallelization', False):
-            logging.info("Using parallel simulator with multiprocessing")
-            simulator = ParallelSimulator(params, grid, signals)
+            if params.get('use_enhanced_parallelization', False):
+                logging.info("Using enhanced parallel simulator with multiprocessing")
+                simulator = EnhancedParallelSimulator(params, grid, signals)
+            else:
+                logging.info("Using parallel simulator with multiprocessing")
+                simulator = ParallelSimulator(params, grid, signals)
         else:
             simulator = InteractiveSimulator(params, grid, signals)
             
@@ -340,13 +345,13 @@ def render_help_window(screen, instructions_window, instructions_pos,
                 "SPACE: Start simulation",
                 "R: Reset environment",
                 "F1: Toggle help display",
-                "",
-                "Zones:",
-                "S: Place safe zone",
-                "H: Place hazard zone",
-                "C: Cancel zone placement",
-                "1/2: Decrease/Increase zone size",
-                f"Current zone size: {zone_size}",
+                # "",
+                # "Zones:",
+                # "S: Place safe zone",
+                # "H: Place hazard zone",
+                # "C: Cancel zone placement",
+                # "1/2: Decrease/Increase zone size",
+                # f"Current zone size: {zone_size}",
                 "",
                 "Directional Zones:",
                 "Arrow Keys: Create directional zones",
