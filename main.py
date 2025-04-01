@@ -114,8 +114,25 @@ def main():
     # Apply barrier type
     barrier_manager.create_barriers(barrier_type)
     
-    # Initialize CSV logging for simulation data
-    csv_info = setup_csv_logger(params)
+    # Handle challenge-specific zone setup
+    challenge_type = params.get('challenge', 0)
+    
+    # Clear any existing zones first
+    zone_manager.clear_zones()
+    
+    # Only create actual zones for specific challenge types
+    # For most challenges, we'll rely on the challenge highlighting and creature detection
+    if challenge_type == 9:  # CHALLENGE_LEFT_EIGHTH
+        zone_manager.create_directional_zone('left', 12.5, 1)  # 12.5% of the map, safe zone (type 1)
+    elif challenge_type in [0, 1, 2, 4, 5, 6, 8, 13, 17]:
+        # These challenges are handled by challenge highlighting and creature detection:
+        # CHALLENGE_CIRCLE, CHALLENGE_RIGHT_HALF, CHALLENGE_RIGHT_QUARTER,
+        # CHALLENGE_CENTER_WEIGHTED, CHALLENGE_CENTER_UNWEIGHTED, CHALLENGE_CENTER_SPARSE,
+        # CHALLENGE_CORNER, CHALLENGE_CORNER_WEIGHTED, CHALLENGE_EAST_WEST_EIGHTHS,
+        # CHALLENGE_ALTRUISM
+        pass
+    
+    # CSV logging is handled by the Logger class in the simulator
     
     # Save parameters
     params['zone_size'] = zone_size
@@ -161,13 +178,6 @@ def render_help_window(screen, instructions_window, instructions_pos,
                 "SPACE: Start simulation",
                 "R: Reset environment",
                 "F1: Toggle help display",
-                # "",
-                # "Zones:",
-                # "S: Place safe zone",
-                # "H: Place hazard zone",
-                # "C: Cancel zone placement",
-                # "1/2: Decrease/Increase zone size",
-                # f"Current zone size: {zone_size}",
                 "",
                 "Directional Zones:",
                 "Arrow Keys: Create directional zones",

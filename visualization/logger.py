@@ -26,10 +26,6 @@ class Logger:
             except Exception as e:
                 print(f"Failed to create log folder '{self.log_folder}': {e}")
 
-        # Create unique filename with timestamp
-        self.timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.filename = os.path.join(self.log_folder, f"evolution_log_{self.timestamp}.csv")
-
         # Create file and write header
         if params['log_to_csv']:
             try:
