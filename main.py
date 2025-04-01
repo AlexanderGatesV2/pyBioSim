@@ -107,210 +107,26 @@ def main():
         pygame.quit()  # Clean up pygame if simulator initialization fails
         return
 
-    # Initialize simulation state variables
-    running = True
-    placing_zone = False
-    zone_type = 1  # 1=safe, 2=hazard
-    zone_size = 50  # Default zone diameter
-    directional_percentage = 25  # Default percentage for directional zones
-    show_help = False  # Help display toggle
-    simulation_started = False
+    # Set default values for parameters that would normally be configured during setup
+    zone_size = params.get('zone_size', 50)  # Default zone diameter
     barrier_type = params.get('barrierType', 0)
-
-    # Setup help/instructions window
-    instructions_size = (350, 425)
-    instructions_window = pygame.Surface(instructions_size)
-    instructions_window.set_alpha(150)  # Semi-transparent background
-    instructions_pos = (10, display_size[1] - instructions_size[1] - 10)
-
-    # Setup fonts for UI text
-    font = pygame.font.SysFont(None, 24)
-    title_font = pygame.font.SysFont(None, 28)
-
+    
+    # Apply barrier type
+    barrier_manager.create_barriers(barrier_type)
+    
     # Initialize CSV logging for simulation data
     csv_info = setup_csv_logger(params)
-
-    # Main setup loop - runs until simulation starts or user quits
-    while running and not simulation_started:
-        # Process user input events
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-                logging.info("Received QUIT event. Exiting setup phase.")
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_SPACE:
-                    # Start the simulation
-                    simulation_started = True
-                    logging.info("SPACE key pressed. Starting simulation.")
-
-                # Zone creation controls
-                elif event.key == pygame.K_s:
-                    # Switch to placing safe zones
-                    placing_zone = True
-                    zone_type = 1
-                    logging.info("S key pressed. Now placing safe zones.")
-                elif event.key == pygame.K_h:
-                    # Switch to placing hazard zones
-                    placing_zone = True
-                    zone_type = 2
-                    logging.info("H key pressed. Now placing hazard zones.")
-                elif event.key == pygame.K_c:
-                    # Cancel zone placement
-                    placing_zone = False
-                    logging.info("C key pressed. Cancelled zone placement.")
-
-                # Directional zone creation controls
-                elif event.key == pygame.K_LEFT:
-                    zone_manager.create_directional_zone('left', directional_percentage, zone_type)
-                    logging.info(f"LEFT key pressed. Created directional zone.")
-                elif event.key == pygame.K_RIGHT:
-                    zone_manager.create_directional_zone('right', directional_percentage, zone_type)
-                    logging.info(f"RIGHT key pressed. Created directional zone.")
-                elif event.key == pygame.K_UP:
-                    zone_manager.create_directional_zone('top', directional_percentage, zone_type)
-                    logging.info(f"UP key pressed. Created directional zone.")
-                elif event.key == pygame.K_DOWN:
-                    zone_manager.create_directional_zone('bottom', directional_percentage, zone_type)
-                    logging.info(f"DOWN key pressed. Created directional zone.")
-
-                # Zone size adjustment controls
-                elif event.key == pygame.K_1:
-                    # Decrease zone size or percentage
-                    if pygame.key.get_mods() & pygame.KMOD_SHIFT:
-                        directional_percentage = max(10, directional_percentage - 10)
-                        logging.info(f"1 key pressed with SHIFT. Directional zone percentage decreased to {directional_percentage}%")
-                    else:
-                        zone_size = max(20, zone_size - 10)
-                        logging.info(f"1 key pressed. Zone size decreased to {zone_size}")
-                elif event.key == pygame.K_2:
-                    # Increase zone size or percentage
-                    if pygame.key.get_mods() & pygame.KMOD_SHIFT:
-                        directional_percentage = min(90, directional_percentage + 10)
-                        logging.info(f"2 key pressed with SHIFT. Directional zone percentage increased to {directional_percentage}%")
-                    else:
-                        zone_size = min(200, zone_size + 10)
-                        logging.info(f"2 key pressed. Zone size increased to {zone_size}")
-
-                # Barrier configuration controls
-                elif event.key == pygame.K_0:
-                    barrier_type = 0
-                    grid.reset()  # Clear existing barriers
-                    barrier_manager.create_barriers(barrier_type)
-                    logging.info("0 key pressed. Barrier type: None")
-                elif event.key == pygame.K_1:
-                    barrier_type = 1
-                    grid.reset()  # Clear existing barriers
-                    barrier_manager.create_barriers(barrier_type)
-                    logging.info("1 key pressed. Barrier type: Vertical bar in center")
-                elif event.key == pygame.K_2:
-                    barrier_type = 2
-                    grid.reset()  # Clear existing barriers
-                    barrier_manager.create_barriers(barrier_type)
-                    logging.info("2 key pressed. Barrier type: Vertical bar in random location")
-                elif event.key == pygame.K_3:
-                    barrier_type = 3
-                    grid.reset()  # Clear existing barriers
-                    barrier_manager.create_barriers(barrier_type)
-                    logging.info("3 key pressed. Barrier type: Five staggered blocks")
-
-                # Help display toggle
-                elif event.key == pygame.K_F1:
-                    show_help = not show_help
-                    logging.info(f"F1 key pressed. Help display {'shown' if show_help else 'hidden'}")
-
-                # Environment reset control
-                elif event.key == pygame.K_r:
-                    # Reset simulation
-                    grid.reset()
-                    # Close existing CSV log file
-                    close_csv_logger(csv_info)
-                    # Create a new log file
-                    csv_info = setup_csv_logger(params)
-                    logging.info("R key pressed. Environment reset.")
-
-            # Zone placement via mouse click
-            elif event.type == pygame.MOUSEBUTTONDOWN and placing_zone:
-                try:
-                    # Convert mouse position to world coordinates, accounting for border
-                    mouse_pos = pygame.mouse.get_pos()
-                    adjusted_x = mouse_pos[0] - border_size
-                    adjusted_y = mouse_pos[1] - border_size
-                    
-                    # Only create zones for clicks within the grid area
-                    if 0 <= adjusted_x < grid_width and 0 <= adjusted_y < grid_height:
-                        world_x = int(adjusted_x / display_scale)
-                        world_y = int(adjusted_y / display_scale)
-                        zone_manager.create_zone((world_x, world_y), zone_size, zone_type)
-                        logging.info(f"Created zone at ({world_x}, {world_y})")
-                except Exception as e:
-                    logging.error(f"Error creating zone: {e}", exc_info=True)
-
-        # Render the setup screen
-        screen.fill((30, 30, 40))  # Dark blue-gray background
-        
-        # Create grid surface with exact dimensions
-        grid_width = grid.size[0] * display_scale
-        grid_height = grid.size[1] * display_scale
-        grid_surface = pygame.Surface((grid_width, grid_height))
-        grid_surface.fill((0, 0, 0))  # Black background for grid
-        
-        # Render the grid content
-        grid_renderer = GridRenderer(display_scale)
-        grid_renderer.render_grid(grid_surface, grid)
-        
-        # Draw border around the grid area
-        border_rect = pygame.Rect(
-            border_size - 2,  # Offset by 2 pixels to make border visible
-            border_size - 2,
-            grid_width + 4,  # Add 4 pixels to make border visible on all sides
-            grid_height + 4
-        )
-        pygame.draw.rect(screen, (100, 100, 100), border_rect, 2)  # Gray border, 2 pixels thick
-        
-        # Place the grid on the main screen with border offset
-        screen.blit(grid_surface, (border_size, border_size))
-
-        # Display instruction text at the top
-        info_text = font.render("Press SPACE to start simulation | Press F1 for Help", True, (255, 255, 255))
-        screen.blit(info_text, (10, 10))
-
-        # Show zone placement information when active
-        if placing_zone:
-            zone_text = font.render(
-                f"Placing {'Safe' if zone_type == 1 else 'Hazard'} Zone | Size: {zone_size}",
-                True, (255, 255, 0))
-            screen.blit(zone_text, (10, 40))
-
-            action_text = font.render("Click to place, C to cancel", True, (255, 255, 0))
-            screen.blit(action_text, (10, 70))
-
-        # Display help window when toggled on
-        if show_help:
-            render_help_window(screen, instructions_window, instructions_pos,
-                               font, title_font, placing_zone, zone_type,
-                               zone_size, directional_percentage, barrier_type)
-
-        # Update the screen
-        pygame.display.flip()
-        clock.tick(30)  # Cap at 30 fps for setup phase
-
-    # Either start the simulation or exit
-    if simulation_started:
-        # Save user-configured parameters
-        params['barrierType'] = barrier_type
-        params['zone_size'] = zone_size
-
-        # Close the setup window
-        pygame.quit()
-        logging.info("Setup phase complete. Starting simulation.")
-
-        # Launch the main simulation
-        simulator.run()
-    else:
-        # Clean up if user quit without starting simulation
-        pygame.quit()
-        close_csv_logger(csv_info)
-        logging.info("Simulation not started. Exiting.")
+    
+    # Save parameters
+    params['zone_size'] = zone_size
+    params['barrierType'] = barrier_type
+    
+    # Close the pygame window
+    pygame.quit()
+    logging.info("Starting simulation directly (setup phase skipped).")
+    
+    # Launch the main simulation
+    simulator.run()
 
 
 
