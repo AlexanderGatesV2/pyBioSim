@@ -3,7 +3,7 @@
 	"display_scale": 6,
 	"genome_length": 24,
 	"mutation_rate": 0.001,
-	"population_size": 3000,
+	"population_size": 100,
 	"steps_per_generation": 300,
 	"enable_parallelization": false,
 	"use_enhanced_parallelization": false,

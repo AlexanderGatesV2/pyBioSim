@@ -120,7 +120,30 @@ class Simulator:
         self.grid.process_death_queue(creatures_dict)
         
         # Process move queue
-        self.grid.process_move_queue(creatures_dict) # Add this call back
+        self.grid.process_move_queue(creatures_dict)
+        
+        # Check for duplicate creatures
+        duplicates = self.grid.check_for_duplicates()
+        if duplicates:
+            print(f"WARNING: Found {len(duplicates)} positions with multiple creatures:")
+            for pos, creature_ids in duplicates:
+                print(f"  Position {pos} has creatures: {creature_ids}")
+                
+                # Fix duplicates by moving all but one creature to a new position
+                first_creature_id = creature_ids[0]
+                for creature_id in creature_ids[1:]:
+                    if creature_id in creatures_dict and creatures_dict[creature_id].alive:
+                        # Find a new empty location
+                        try:
+                            new_pos = self.grid.find_empty_location()
+                            # Update grid
+                            self.grid.data[pos[0], pos[1], 0] = first_creature_id
+                            self.grid.data[int(new_pos[0]), int(new_pos[1]), 0] = creature_id
+                            # Update creature position
+                            creatures_dict[creature_id].position = new_pos
+                            print(f"    Moved creature {creature_id} to {new_pos}")
+                        except Exception as e:
+                            print(f"    Failed to move creature {creature_id}: {e}")
 
         # Fade pheromones
         for layer in range(self.signals.num_layers):
@@ -398,15 +421,36 @@ class Simulator:
                 if self.grid.data[x, y, 0] > 0:  # Only clear creature IDs
                     self.grid.data[x, y, 0] = 0
 
+        # Track occupied positions to avoid duplicates
+        occupied_positions = set()
+        
         # Place creatures at random locations
         for creature in self.population.creatures:
             # Find an empty location
             position = self.grid.find_empty_location()
+            
+            # Ensure the position is not already occupied
+            attempts = 0
+            while (int(position[0]), int(position[1])) in occupied_positions and attempts < 10:
+                position = self.grid.find_empty_location()
+                attempts += 1
+                
+            # Mark position as occupied
+            occupied_positions.add((int(position[0]), int(position[1])))
+            
+            # Update creature position
             creature.position = position
 
             # Update grid
             x, y = int(position[0]), int(position[1])
             self.grid.data[x, y, 0] = creature.id
+            
+        # Verify no duplicates
+        duplicates = self.grid.check_for_duplicates()
+        if duplicates:
+            print(f"WARNING: Found {len(duplicates)} positions with multiple creatures after placement:")
+            for pos, creature_ids in duplicates:
+                print(f"  Position {pos} has creatures: {creature_ids}")
 
     def _display_sample_genomes(self, count):
         """
