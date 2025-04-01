@@ -64,8 +64,26 @@ class Simulator:
         # Create barriers
         self.barrier_manager.create_barriers(self.params.get('barrierType', 0))
 
-        # Create zones
-        self.zone_manager.place_random_zones()
+        # Clear any existing zones first
+        self.zone_manager.clear_zones()
+        
+        # Create zones based on challenge type
+        challenge_type = self.params.get('challenge', 0)
+        
+        # Only create actual zones for specific challenge types
+        # For most challenges, we'll rely on the challenge highlighting and creature detection
+        if challenge_type == 9:  # CHALLENGE_LEFT_EIGHTH
+            self.zone_manager.create_directional_zone('left', 12.5, 1)  # 12.5% of the map, safe zone (type 1)
+        elif challenge_type in [0, 1, 2, 4, 5, 6, 8, 13, 17]:
+            # These challenges are handled by challenge highlighting and creature detection:
+            # CHALLENGE_CIRCLE, CHALLENGE_RIGHT_HALF, CHALLENGE_RIGHT_QUARTER,
+            # CHALLENGE_CENTER_WEIGHTED, CHALLENGE_CENTER_UNWEIGHTED, CHALLENGE_CENTER_SPARSE,
+            # CHALLENGE_CORNER, CHALLENGE_CORNER_WEIGHTED, CHALLENGE_EAST_WEST_EIGHTHS,
+            # CHALLENGE_ALTRUISM
+            pass
+        else:
+            # For other challenges, place random zones
+            self.zone_manager.place_random_zones()
 
         # Setup radiation if enabled
         if self.params.get('enable_radioactive_environment', False):
@@ -569,6 +587,7 @@ class Simulator:
                 # Update renderer with current state
                 self.renderer.set_generation(self.generation)
                 self.renderer.set_step(self.step)
+                self.renderer.set_kill_count(self.murder_count)
                 
                 # Update params with current step for challenge visualization
                 self.params['current_step'] = self.step

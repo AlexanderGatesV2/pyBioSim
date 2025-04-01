@@ -111,24 +111,19 @@ class CreatureRenderer:
                 screen_x = int(creature.position[0] * scale + scale / 2)
                 screen_y = int(creature.position[1] * scale + scale / 2)
                 
-                # Allow creatures to be rendered even if they're at the edge
-                # Just make sure they're within the grid bounds
-                if (screen_x < 0 or screen_x >= screen_width or
-                    screen_y < 0 or screen_y >= screen_height):
+                # Skip creatures that are outside the visible screen
+                if screen_x < 0:
+                    continue
+                if screen_x >= screen_width:
+                    continue
+                if screen_y < 0:
+                    continue
+                if screen_y >= screen_height:
                     continue
                 
                 # Get genome-based color for this creature
                 creature_color = self.genome_to_color(creature.genome)
                 
-                # Creatures in safe zone get a yellow highlight
-                if creature.in_safe_zone:
-                    # Draw yellow outline
-                    pygame.draw.circle(screen, (255, 255, 0),
-                                       (screen_x, screen_y),
-                                       size + 1)  # Outline
-                    
-                    # Safe zone creatures are slightly larger
-                    size = min(scale - 1, int(scale * 0.75))
                 
                 # Draw the creature with its genome-based color
                 pygame.draw.circle(screen, creature_color,
@@ -149,10 +144,15 @@ class CreatureRenderer:
                                     int((creature.position[1] + creature.direction[1] * line_length) * scale + scale / 2))
                         
                         # Only draw direction line if it's fully on screen
-                        if (0 <= line_end[0] < screen_width and 0 <= line_end[1] < screen_height):
-                            pygame.draw.line(screen, (255, 255, 255),
-                                            (screen_x, screen_y),
-                                            line_end, params.get('direction_line_thickness', 1))
+                        if line_end[0] >= 0 and line_end[0] < screen_width:
+                            if line_end[1] >= 0 and line_end[1] < screen_height:
+                                pygame.draw.line(
+                                    screen, 
+                                    (255, 255, 255),
+                                    (screen_x, screen_y),
+                                    line_end, 
+                                    params.get('direction_line_thickness', 1)
+                                )
     
     def genome_to_color(self, genome):
         """
@@ -235,6 +235,10 @@ class Renderer:
         self.instructions_window = pygame.Surface(self.instructions_size)
         self.instructions_window.set_alpha(200)  # Semi-transparent
         self.instructions_pos = (10, self.display_size[1] - self.instructions_size[1] - 10)
+        
+        # Kill counter
+        self.kill_count = 0
+        self.show_kill_counter = False  # Toggle for kill counter display
     
     def render_help_window(self):
         """Render the help window with instructions"""
@@ -253,13 +257,23 @@ class Renderer:
             f"Status: {'PAUSED' if hasattr(self, 'paused') and self.paused else 'RUNNING'}",
             "SPACE: Pause/Resume simulation",
             "+/-: Adjust simulation speed",
-            f"Speed: {self.params['fps']} fps",
+            f"Speed: {self.params['fps']} fps"
+        ]
+        
+        # Add kill count if kill counter is enabled
+        if self.show_kill_counter:
+            controls.append(f"Kills: {self.kill_count}")
+            
+        # Continue with the rest of the controls
+        controls.extend([
             "",
             "Visual Controls:",
             "S: Toggle challenge highlighting",
             f"Challenge highlighting: {'ON' if self.params.get('show_challenge_areas', False) else 'OFF'}",
             "D: Toggle direction lines",
             f"Direction lines: {'ON' if self.params.get('show_direction_lines', True) else 'OFF'}",
+            "K: Toggle kill counter",
+            f"Kill counter: {'ON' if self.show_kill_counter else 'OFF'}",
             "",
             "Barrier Types:",
             "0: No barriers",
@@ -272,8 +286,8 @@ class Renderer:
             "G: Force new generation (when paused)",
             "R: Reset simulation and delete logs (when paused)",
             "",
-            "F1: Toggle help display",
-        ]
+            "F1: Toggle help display"
+        ])
 
         for control in controls:
             if control == "":
@@ -351,6 +365,15 @@ class Renderer:
                 True, (255, 255, 0))
             self.world.blit(challenge_text, (10, 60))
             
+        # Display kill count if kill counter is enabled
+        if self.show_kill_counter:
+            # Make the kill counter more visible
+            kill_text = self.font.render(
+                f"KILLS: {self.kill_count}",
+                True, (255, 0, 0))  # Red text for kills
+            # Position at top right with more margin
+            self.world.blit(kill_text, (self.display_size[0] - 150, 10))
+            
         # Show help window if enabled
         if self.show_help:
             self.render_help_window()
@@ -366,6 +389,10 @@ class Renderer:
     def set_step(self, step):
         """Set the current step number"""
         self.step = step
+        
+    def set_kill_count(self, kill_count):
+        """Set the current kill count"""
+        self.kill_count = kill_count
     
     def handle_events(self):
         """
@@ -401,6 +428,11 @@ class Renderer:
                 # Direction lines toggle
                 elif event.key == pygame.K_d:
                     self.params['show_direction_lines'] = not self.params.get('show_direction_lines', True)
+                    
+                # Kill counter toggle
+                elif event.key == pygame.K_k:
+                    self.show_kill_counter = not self.show_kill_counter
+                    print(f"Kill counter {'ON' if self.show_kill_counter else 'OFF'}")
                 
                 # Barrier type keys (0-3) - these need to be handled by the simulator
                 # We'll just store the key event and let the simulator handle it

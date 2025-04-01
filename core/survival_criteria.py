@@ -109,8 +109,10 @@ class SurvivalCriteria:
         if result[0]:
             return result
         else:
-            # Otherwise return the fallback score
-            return (False, fallback_score)
+            # Otherwise, allow creatures with high energy to survive as a fallback
+            # This ensures at least some creatures survive each generation
+            fallback_survival = energy_factor > 0.5  # Creatures with >50% energy survive
+            return (fallback_survival, fallback_score)
 
     def challenge_circle(self, creature):
         """

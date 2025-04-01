@@ -36,3 +36,5 @@ Thumbs.db
 # C++ build artifacts (for comparison testing)
 *.o
 *.out
+core/simulator.py.bak
+visualization/interactive_simulator.py.bak

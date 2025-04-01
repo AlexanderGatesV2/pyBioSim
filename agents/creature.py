@@ -171,6 +171,7 @@ class Creature:
 
     def _process_zone_effects(self, zone_type):
         """Process effects of being in different zone types"""
+        # Check for actual zones in the grid
         if zone_type == 1:  # Safe zone
             self.in_safe_zone = True
             # Add energy bonus for being in safe zone
@@ -181,7 +182,82 @@ class Creature:
             self.energy -= self.params.get('hazard_zone_penalty', 10.0)
             self.energy = max(0.0, self.energy)  # Prevent negative energy
         else:
-            self.in_safe_zone = False
+            # If no zone in the grid, check if we're in a challenge area
+            challenge_type = self.params.get('challenge', 0)
+            
+            # Handle each challenge type
+            if challenge_type == 0:  # CHALLENGE_CIRCLE
+                # Circle in the top-left quadrant
+                center_x = self.params['world_size'][0] // 4
+                center_y = self.params['world_size'][1] // 4
+                radius = self.params['world_size'][0] // 4
+                dx = self.position[0] - center_x
+                dy = self.position[1] - center_y
+                distance = math.sqrt(dx * dx + dy * dy)
+                self.in_safe_zone = distance <= radius
+                
+            elif challenge_type == 1:  # CHALLENGE_RIGHT_HALF
+                # Right half of the arena
+                self.in_safe_zone = self.position[0] > self.params['world_size'][0] // 2
+                
+            elif challenge_type == 2:  # CHALLENGE_RIGHT_QUARTER
+                # Right quarter of the arena
+                start_x = self.params['world_size'][0] // 2 + self.params['world_size'][0] // 4
+                self.in_safe_zone = self.position[0] >= start_x
+                
+            elif challenge_type == 9:  # CHALLENGE_LEFT_EIGHTH
+                # Left eighth of the arena
+                end_x = self.params['world_size'][0] // 8
+                self.in_safe_zone = self.position[0] < end_x
+                
+            elif challenge_type == 4 or challenge_type == 8:  # CHALLENGE_CENTER_WEIGHTED or CHALLENGE_CENTER_SPARSE
+                # Circle in the center
+                center_x = self.params['world_size'][0] // 2
+                center_y = self.params['world_size'][1] // 2
+                radius = self.params['world_size'][0] // 3 if challenge_type == 4 else self.params['world_size'][0] // 4
+                dx = self.position[0] - center_x
+                dy = self.position[1] - center_y
+                distance = math.sqrt(dx * dx + dy * dy)
+                self.in_safe_zone = distance <= radius
+                
+            elif challenge_type == 5 or challenge_type == 6:  # CHALLENGE_CORNER or CHALLENGE_CORNER_WEIGHTED
+                # Corners of the arena
+                radius = self.params['world_size'][0] // 8
+                corners = [
+                    (0, 0),
+                    (0, self.params['world_size'][1] - 1),
+                    (self.params['world_size'][0] - 1, 0),
+                    (self.params['world_size'][0] - 1, self.params['world_size'][1] - 1)
+                ]
+                
+                for corner in corners:
+                    dx = self.position[0] - corner[0]
+                    dy = self.position[1] - corner[1]
+                    distance = math.sqrt(dx * dx + dy * dy)
+                    if distance <= radius:
+                        self.in_safe_zone = True
+                        break
+                else:
+                    self.in_safe_zone = False
+                    
+            elif challenge_type == 13:  # CHALLENGE_EAST_WEST_EIGHTHS
+                # Leftmost or rightmost eighth
+                left_boundary = self.params['world_size'][0] // 8
+                right_boundary = self.params['world_size'][0] - self.params['world_size'][0] // 8
+                self.in_safe_zone = (self.position[0] < left_boundary or self.position[0] >= right_boundary)
+                
+            elif challenge_type == 17:  # CHALLENGE_ALTRUISM
+                # NW quadrant safe zone
+                center_x = self.params['world_size'][0] // 4
+                center_y = self.params['world_size'][1] // 4
+                radius = self.params['world_size'][0] // 4
+                dx = self.position[0] - center_x
+                dy = self.position[1] - center_y
+                distance = math.sqrt(dx * dx + dy * dy)
+                self.in_safe_zone = distance <= radius
+                
+            else:
+                self.in_safe_zone = False
 
     def _apply_state_updates(self, state_updates, signals, grid=None, creatures=None):
         """Apply non-movement state updates from neural network"""
@@ -251,8 +327,86 @@ class Creature:
         """Detect and record environmental information"""
         x, y = int(self.position[0]), int(self.position[1])
 
-        # Record current zone type
-        self.in_safe_zone = (grid.data[x, y, 2] == 1)
+        # Check for actual zones in the grid
+        if grid.data[x, y, 2] == 1:
+            self.in_safe_zone = True
+        else:
+            # If no zone in the grid, check if we're in a challenge area
+            challenge_type = self.params.get('challenge', 0)
+            
+            # Handle each challenge type
+            if challenge_type == 0:  # CHALLENGE_CIRCLE
+                # Circle in the top-left quadrant
+                center_x = self.params['world_size'][0] // 4
+                center_y = self.params['world_size'][1] // 4
+                radius = self.params['world_size'][0] // 4
+                dx = self.position[0] - center_x
+                dy = self.position[1] - center_y
+                distance = math.sqrt(dx * dx + dy * dy)
+                self.in_safe_zone = distance <= radius
+                
+            elif challenge_type == 1:  # CHALLENGE_RIGHT_HALF
+                # Right half of the arena
+                self.in_safe_zone = self.position[0] > self.params['world_size'][0] // 2
+                
+            elif challenge_type == 2:  # CHALLENGE_RIGHT_QUARTER
+                # Right quarter of the arena
+                start_x = self.params['world_size'][0] // 2 + self.params['world_size'][0] // 4
+                self.in_safe_zone = self.position[0] >= start_x
+                
+            elif challenge_type == 9:  # CHALLENGE_LEFT_EIGHTH
+                # Left eighth of the arena
+                end_x = self.params['world_size'][0] // 8
+                self.in_safe_zone = self.position[0] < end_x
+                
+            elif challenge_type == 4 or challenge_type == 8:  # CHALLENGE_CENTER_WEIGHTED or CHALLENGE_CENTER_SPARSE
+                # Circle in the center
+                center_x = self.params['world_size'][0] // 2
+                center_y = self.params['world_size'][1] // 2
+                radius = self.params['world_size'][0] // 3 if challenge_type == 4 else self.params['world_size'][0] // 4
+                dx = self.position[0] - center_x
+                dy = self.position[1] - center_y
+                distance = math.sqrt(dx * dx + dy * dy)
+                self.in_safe_zone = distance <= radius
+                
+            elif challenge_type == 5 or challenge_type == 6:  # CHALLENGE_CORNER or CHALLENGE_CORNER_WEIGHTED
+                # Corners of the arena
+                radius = self.params['world_size'][0] // 8
+                corners = [
+                    (0, 0),
+                    (0, self.params['world_size'][1] - 1),
+                    (self.params['world_size'][0] - 1, 0),
+                    (self.params['world_size'][0] - 1, self.params['world_size'][1] - 1)
+                ]
+                
+                for corner in corners:
+                    dx = self.position[0] - corner[0]
+                    dy = self.position[1] - corner[1]
+                    distance = math.sqrt(dx * dx + dy * dy)
+                    if distance <= radius:
+                        self.in_safe_zone = True
+                        break
+                else:
+                    self.in_safe_zone = False
+                    
+            elif challenge_type == 13:  # CHALLENGE_EAST_WEST_EIGHTHS
+                # Leftmost or rightmost eighth
+                left_boundary = self.params['world_size'][0] // 8
+                right_boundary = self.params['world_size'][0] - self.params['world_size'][0] // 8
+                self.in_safe_zone = (self.position[0] < left_boundary or self.position[0] >= right_boundary)
+                
+            elif challenge_type == 17:  # CHALLENGE_ALTRUISM
+                # NW quadrant safe zone
+                center_x = self.params['world_size'][0] // 4
+                center_y = self.params['world_size'][1] // 4
+                radius = self.params['world_size'][0] // 4
+                dx = self.position[0] - center_x
+                dy = self.position[1] - center_y
+                distance = math.sqrt(dx * dx + dy * dy)
+                self.in_safe_zone = distance <= radius
+                
+            else:
+                self.in_safe_zone = False
 
         # Record nearby creatures
         self.detected_creatures = []
@@ -280,6 +434,8 @@ class Creature:
             # Queue target for death
             grid.queue_for_death(target_id)
             self.has_killed = True
+            # Print debug info
+            print(f"Creature {self.id} killed creature {target_id} at position ({front_x}, {front_y})")
 
             # Find target creature to calculate energy gain
             for other in creatures:
