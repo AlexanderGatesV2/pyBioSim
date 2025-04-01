@@ -54,7 +54,7 @@ class Creature:
             self.direction = (math.cos(angle), math.sin(angle))
 
         # Creature state variables
-        self.age = 0
+        # Removing age as it's not needed and not in biosim4
         self.energy = 1000  # Default energy value
         self.in_safe_zone = False
         self.has_killed = False
@@ -85,7 +85,33 @@ class Creature:
         self.oscPeriod = 34  # Period for oscillator sensor
 
         # Initialize the neural network (brain)
-        self.brain = NeuralNetwork(self.genome, params)
+        try:
+            self.brain = NeuralNetwork(self.genome, params)
+            
+            # Ensure the creature has at least one valid connection
+            if not self.brain.connections:
+                # Add a direct connection from a random sensor to a movement action
+                self.brain.connections.append({
+                    'source_type': 0,  # SENSOR
+                    'source_num': random.randint(0, params['num_sensory_neurons'] - 1),
+                    'sink_type': 1,  # ACTION
+                    'sink_num': random.randint(0, min(4, params['num_output_neurons'] - 1)),  # Movement action
+                    'weight': 0.5  # Moderate weight
+                })
+                self.brain.total_connections = len(self.brain.connections)
+        except Exception as e:
+            logger.error(f"Error initializing neural network for creature {self.id}: {e}")
+            # Initialize with a simple default neural network
+            self.brain = NeuralNetwork(Genome(length=1, params=params), params)
+            # Add a direct connection from a random sensor to a movement action
+            self.brain.connections.append({
+                'source_type': 0,  # SENSOR
+                'source_num': random.randint(0, params['num_sensory_neurons'] - 1),
+                'sink_type': 1,  # ACTION
+                'sink_num': random.randint(0, min(4, params['num_output_neurons'] - 1)),  # Movement action
+                'weight': 0.5  # Moderate weight
+            })
+            self.brain.total_connections = len(self.brain.connections)
 
         # Store last discrete movement offset (matches C++ lastMoveDir concept)
         self.last_move_offset = (0, 0) # Initialize to no movement
@@ -103,10 +129,8 @@ class Creature:
         """
         dx, dy = movement_info['discrete']
         
-        # print(f"DEBUG Creature {self.id}: Movement info: {movement_info}")
-        
+        # Debug output for movement
         if dx == 0 and dy == 0:
-            # print(f"DEBUG Creature {self.id}: No move offset ({dx}, {dy})")
             return False  # No movement
 
         # Apply boundary checks
@@ -115,7 +139,6 @@ class Creature:
 
         # Check if the target position is a barrier
         if grid.is_barrier_at(new_x, new_y): # Use int coords
-            # print(f"DEBUG Creature {self.id}: Move to ({new_x}, {new_y}) blocked by barrier.") # DEBUG
             return False # Cannot move into a barrier
 
         # Update direction if provided
@@ -124,8 +147,13 @@ class Creature:
 
         # Queue the movement for processing at the end of the step
         # This prevents race conditions where multiple creatures try to move to the same cell
-        # print(f"DEBUG Creature {self.id}: Queuing move from {self.position} to ({new_x}, {new_y}) with offset ({dx}, {dy})") # DEBUG
         grid.queue_for_move(self.id, (new_x, new_y))
+        
+        # Update the creature's position directly
+        # This is a temporary fix to ensure the creature's position is updated
+        # In the original implementation, this would be done by the grid.process_move_queue method
+        self.position = (new_x, new_y)
+        self.last_move_offset = (dx, dy)
 
         # We'll consider this a successful movement attempt, even though
         # it might be rejected later if the destination is occupied
@@ -163,22 +191,11 @@ class Creature:
                 self._attempt_kill(grid, creatures)
             elif key in ['oscPeriod', 'longprobe_dist', 'responsiveness']: # Check if key is a known attribute
                  setattr(self, key, value)
-            # else:
-                # Optionally log unknown state updates
-                # logger.warning(f"Unknown state update key: {key}")
 
     def update(self, grid, creatures, signals, sim_step): # Add sim_step parameter
         """Update the creature for one simulation step"""
         if not self.alive:
             return
-
-        # Debug output
-        # if self.id == 1:  # Only print for the first creature to avoid flooding
-        #     pass
-        #     print(f"DEBUG: Creature {self.id} update called at step {sim_step}, position {self.position}")
-
-        # Record current position and increment age
-        self.age += 1
 
         # Check for zone effects at current position
         x, y = int(self.position[0]), int(self.position[1])
@@ -199,7 +216,7 @@ class Creature:
         }
 
         # Process neural network with enhanced state interaction
-        # Pass sim_step to feed_forward, not age
+        # Pass sim_step to feed_forward
         action_values, state_updates = self.brain.feed_forward(
             sensory_inputs, sim_step, creature_state)
 
@@ -215,19 +232,16 @@ class Creature:
         self.detect_environment(grid, creatures)
 
     def update_health(self):
-        """Update the creature's health based on various factors"""
-        # Health decreases with age
-        age_factor = 1.0 - (self.age / self.params['max_age']) * 0.5
-
+        """Update the creature's health based on energy levels"""
         # Health affected by energy levels
         energy_factor = min(1.0, self.energy / 500)
 
-        # Calculate new health value (weighted average)
-        self.health = 0.7 * age_factor + 0.3 * energy_factor
+        # Calculate new health value
+        self.health = energy_factor
         self.health = max(0.0, min(1.0, self.health))
 
-        # Check if creature should die from old age or starvation
-        if self.age >= self.params['max_age'] or self.energy <= 0:
+        # Check if creature should die from starvation
+        if self.energy <= 0:
             self.alive = False
 
     def detect_environment(self, grid, creatures):

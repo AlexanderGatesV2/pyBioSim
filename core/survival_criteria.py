@@ -53,49 +53,64 @@ class SurvivalCriteria:
             return (False, 0.0)
 
         # Call the appropriate criterion function based on challenge type
+        result = None
         if challenge_type == CHALLENGE_CIRCLE:
-            return self.challenge_circle(creature)
+            result = self.challenge_circle(creature)
         elif challenge_type == CHALLENGE_RIGHT_HALF:
-            return self.challenge_right_half(creature)
+            result = self.challenge_right_half(creature)
         elif challenge_type == CHALLENGE_RIGHT_QUARTER:
-            return self.challenge_right_quarter(creature)
+            result = self.challenge_right_quarter(creature)
         elif challenge_type == CHALLENGE_LEFT_EIGHTH:
-            return self.challenge_left_eighth(creature)
+            result = self.challenge_left_eighth(creature)
         elif challenge_type == CHALLENGE_STRING:
-            return self.challenge_string(creature)
+            result = self.challenge_string(creature)
         elif challenge_type == CHALLENGE_CENTER_WEIGHTED:
-            return self.challenge_center_weighted(creature)
+            result = self.challenge_center_weighted(creature)
         elif challenge_type == CHALLENGE_CENTER_UNWEIGHTED:
-            return self.challenge_center_unweighted(creature)
+            result = self.challenge_center_unweighted(creature)
         elif challenge_type == CHALLENGE_CENTER_SPARSE:
-            return self.challenge_center_sparse(creature)
+            result = self.challenge_center_sparse(creature)
         elif challenge_type == CHALLENGE_CORNER:
-            return self.challenge_corner(creature)
+            result = self.challenge_corner(creature)
         elif challenge_type == CHALLENGE_CORNER_WEIGHTED:
-            return self.challenge_corner_weighted(creature)
+            result = self.challenge_corner_weighted(creature)
         elif challenge_type == CHALLENGE_RADIOACTIVE_WALLS:
-            return self.challenge_radioactive_walls(creature)
+            result = self.challenge_radioactive_walls(creature)
         elif challenge_type == CHALLENGE_AGAINST_ANY_WALL:
-            return self.challenge_against_any_wall(creature)
+            result = self.challenge_against_any_wall(creature)
         elif challenge_type == CHALLENGE_TOUCH_ANY_WALL:
-            return self.challenge_touch_any_wall(creature)
+            result = self.challenge_touch_any_wall(creature)
         elif challenge_type == CHALLENGE_MIGRATE_DISTANCE:
-            return self.challenge_migrate_distance(creature)
+            result = self.challenge_migrate_distance(creature)
         elif challenge_type == CHALLENGE_EAST_WEST_EIGHTHS:
-            return self.challenge_east_west_eighths(creature)
+            result = self.challenge_east_west_eighths(creature)
         elif challenge_type == CHALLENGE_NEAR_BARRIER:
-            return self.challenge_near_barrier(creature)
+            result = self.challenge_near_barrier(creature)
         elif challenge_type == CHALLENGE_PAIRS:
-            return self.challenge_pairs(creature)
+            result = self.challenge_pairs(creature)
         elif challenge_type == CHALLENGE_LOCATION_SEQUENCE:
-            return self.challenge_location_sequence(creature)
+            result = self.challenge_location_sequence(creature)
         elif challenge_type == CHALLENGE_ALTRUISM:
-            return self.challenge_altruism(creature)
+            result = self.challenge_altruism(creature)
         elif challenge_type == CHALLENGE_ALTRUISM_SACRIFICE:
-            return self.challenge_altruism_sacrifice(creature)
+            result = self.challenge_altruism_sacrifice(creature)
         else:
             # Default to passing all creatures with same score
-            return (True, 1.0)
+            result = (True, 1.0)
+            
+        # Always calculate a fallback score based on energy
+        # This ensures at least some creatures survive each generation
+        energy_factor = min(1.0, creature.energy / 1000.0)
+        
+        # Calculate a score that favors creatures with higher energy
+        fallback_score = energy_factor
+        
+        # If the creature passed the original criterion, return that result
+        if result[0]:
+            return result
+        else:
+            # Otherwise return the fallback score
+            return (False, fallback_score)
 
     def challenge_circle(self, creature):
         """

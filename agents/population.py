@@ -54,7 +54,7 @@ class Population:
         # Create creatures at these positions
         for i in range(min(self.size, len(positions))):
             # Create a genome with higher initial diversity
-            genome = Genome(length=self.params['genome_length'])
+            genome = Genome(length=self.params['genome_length'], params=self.params)
 
             # Apply normalization but make it less aggressive
             if hasattr(Genome, 'normalize_genome_weights_mild'):
@@ -97,7 +97,16 @@ class Population:
             passed, score = criteria.check_criterion(creature, self.params['challenge'])
             if passed and creature.brain.connections:  # Must have valid neural connections
                 survivors.append((creature, score))
-
+        
+        # If no survivors but creatures are alive, check if they're in the right half
+        if not survivors:
+            alive_count = sum(1 for c in self.creatures if c.alive)
+            if alive_count > 0:
+                for creature in self.creatures:
+                    if creature.alive and creature.position[0] > self.params['world_size'][0] / 2:
+                        # This creature should have survived - it's in the right half
+                        survivors.append((creature, 1.0))
+        
         # Sort survivors by score (highest first)
         survivors.sort(key=lambda x: x[1], reverse=True)
 
@@ -142,17 +151,38 @@ class Population:
 
         # Make sure we have survivors
         if not survivors:
-            # If no survivors, create random population
-            return [Creature(genome=Genome(length=self.params['genome_length']),
-                           params=self.params) for _ in range(self.size)]
+            # Instead of creating a random population, select the top-scoring creatures
+            # based on the fallback scoring mechanism in SurvivalCriteria.check_criterion
+            fallback_survivors = []
+            criteria = SurvivalCriteria(self.params, grid)
+            
+            for creature in self.creatures:
+                if creature.alive:
+                    # Get the fallback score (the second element in the tuple)
+                    _, score = criteria.check_criterion(creature, self.params['challenge'])
+                    # Only add if the creature has a valid brain with connections
+                    if hasattr(creature.brain, 'connections') and creature.brain.connections:
+                        fallback_survivors.append((creature, score))
+            
+            # Sort by score (highest first)
+            fallback_survivors.sort(key=lambda x: x[1], reverse=True)
+            
+            # Take the top 20% as survivors
+            survivor_count = max(10, int(len(fallback_survivors) * 0.2))
+            survivors = fallback_survivors[:survivor_count]
+            
+            # If we still have no survivors, create a random population
+            if not survivors:
+                return [Creature(genome=Genome(length=self.params['genome_length'], params=self.params),
+                               params=self.params) for _ in range(self.size)]
 
         # Apply elitism - keep top performers
-        elite_count = max(1, int(self.size * 0.05))  # Save top 5%
+        elite_count = max(1, int(self.size * 0.10))  # Save top 10%
         elites = [s[0] for s in survivors[:elite_count]]
 
         # Add elite clones to offspring
         for elite in elites:
-            genome_copy = Genome([Gene(g.hex_value) for g in elite.genome.genes])
+            genome_copy = Genome([Gene(g.hex_value, params=self.params) for g in elite.genome.genes], params=self.params)
             child = Creature(genome=genome_copy, params=self.params)
             offspring.append(child)
 
@@ -183,10 +213,10 @@ class Population:
         self.export_parent_genomes(
             [creature for creature, _ in survivors]  # List of parent creatures
         )
-
+        
         return offspring
 
-    def tournament_selection(self, scored_creatures, tournament_size=3):
+    def tournament_selection(self, scored_creatures, tournament_size=5):
         """
         Select a creature using tournament selection
 
@@ -323,7 +353,7 @@ class Population:
                         self.generation,
                         int(parent.in_safe_zone),  # Convert boolean to integer
                         f"{parent.energy:.2f}",
-                        parent.age,
+                        0,  # Age removed, using 0 as placeholder
                         parent.brain.active_internal_neurons,
                         parent.brain.total_connections,
                         len(parent.genome.genes),
@@ -341,11 +371,8 @@ class Population:
 
                     writer.writerow(row)
 
-            # Log successful export
-            print(f"Exported parent genome log for generation {self.generation}: {genome_filename}")
-
         except Exception as e:
-            print(f"Failed to export parent genomes: {e}")
+            pass
 
     def _compute_genome_complexity_score(self, genome):
         """

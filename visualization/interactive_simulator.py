@@ -419,6 +419,16 @@ class InteractiveSimulator:
             # Set creature position and update grid
             creature.position = position
             self.grid.data[int(position[0]), int(position[1]), 0] = creature.id
+            
+            # Initialize creature's last_move_offset to (0, 0)
+            creature.last_move_offset = (0, 0)
+            
+            # Ensure direction is properly initialized
+            if not hasattr(creature, 'direction') or creature.direction == (0, 0):
+                import math
+                import random
+                angle = random.uniform(0, 2 * math.pi)
+                creature.direction = (math.cos(angle), math.sin(angle))
 
     def render(self):
         """Render the current state of the simulation"""
@@ -440,10 +450,10 @@ class InteractiveSimulator:
                            if self.population.creatures else 0)
 
         # Show safe zone status
-        safe_text = self.font.render(
-            f"Safe Zones: {safe_count}/{len(self.population.creatures)} ({safe_percentage:.1f}%)",
-            True, (0, 255, 0))
-        self.screen.blit(safe_text, (10, 35))
+        # safe_text = self.font.render(
+        #     f"Safe Zones: {safe_count}/{len(self.population.creatures)} ({safe_percentage:.1f}%)",
+        #     True, (0, 255, 0))
+        # self.screen.blit(safe_text, (10, 35))
         
         # Display challenge name and highlighting status
         challenge_type = self.params.get('challenge', None)
@@ -453,7 +463,7 @@ class InteractiveSimulator:
             challenge_text = self.font.render(
                 f"Challenge: {challenge_name} | Highlighting: {highlight_status}",
                 True, (255, 255, 0))
-            self.screen.blit(challenge_text, (10, 60))
+            self.screen.blit(challenge_text, (10, 35))
 
         # Show status if paused
         if self.paused:
