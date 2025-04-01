@@ -107,11 +107,22 @@ python main.py --config custom_config.json
 -  **SPACE**: Pause/Resume simulation
 -  **S**: Toggle challenge area highlighting
 -  **D**: Toggle direction lines
+-  **K**: Toggle kill counter display
 -  **0-3**: Change barrier type
 -  **+/-**: Adjust simulation speed
 -  **G**: Force new generation (when paused)
 -  **R**: Reset simulation (when paused)
 -  **F1**: Toggle help display
+
+### Kill Counter
+
+The simulation includes a kill counter feature that tracks how many creatures are killed during each generation. This feature works when the kill neuron is enabled in your configuration.
+
+-  Press **K** to toggle the kill counter display on/off
+-  When enabled, the kill count appears in red text at the top-right of the screen
+-  The kill count is also displayed in the help window (press F1)
+-  The counter resets at the end of each generation
+-  This feature helps track predatory behavior in the simulation
 
 ## Configuration
 
