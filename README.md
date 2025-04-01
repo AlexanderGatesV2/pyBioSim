@@ -104,21 +104,6 @@ python main.py --config custom_config.json
 
 ### Controls
 
-During setup phase:
-
--  **SPACE**: Start simulation
--  **S**: Place safe zone
--  **H**: Place hazard zone
--  **C**: Cancel zone placement
--  **Arrow Keys**: Create directional zones
--  **1/2**: Decrease/Increase zone size
--  **SHIFT+1/2**: Adjust directional zone percentage
--  **0-3**: Select barrier type
--  **F1**: Toggle help display
--  **R**: Reset environment
-
-During simulation:
-
 -  **SPACE**: Pause/Resume simulation
 -  **S**: Toggle challenge area highlighting
 -  **D**: Toggle direction lines

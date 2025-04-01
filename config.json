@@ -1,6 +1,6 @@
 {
 	"world_size": [128, 128],
-	"display_scale": 3,
+	"display_scale": 6,
 	"genome_length": 48,
 	"mutation_rate": 0.001,
 	"population_size": 1000,
