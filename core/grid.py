@@ -327,7 +327,8 @@ class Grid:
             new_x, new_y = int(new_pos[0]), int(new_pos[1])
             
             # Check if destination is valid (empty, not a barrier) and not reserved by another creature
-            if self.is_valid_move_target(new_x, new_y) and (new_x, new_y) not in reserved_positions:
+            # Also ensure the destination is not already occupied by another creature
+            if self.is_valid_move_target(new_x, new_y) and (new_x, new_y) not in reserved_positions and self.data[new_x, new_y, 0] == 0:
                 # This is a valid move
                 valid_moves.append((creature_id, new_pos))
                 # Reserve this position
