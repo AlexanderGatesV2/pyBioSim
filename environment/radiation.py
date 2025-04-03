@@ -27,6 +27,11 @@ class RadiationManager:
         if not self.params['enable_radioactive_environment']:
             return
 
+        # Print radiation settings
+        radiation_intensity = self.params.get('radiation_intensity', 1.0)
+        radiation_falloff = self.params.get('radiation_falloff_factor', 10.0)
+        print(f"RADIATION SETTINGS: Intensity = {radiation_intensity}, Falloff = {radiation_falloff}")
+
         # Reset counter
         self.radiation_step_counter = 0
 
@@ -61,10 +66,12 @@ class RadiationManager:
         # Check if it's time to switch walls
         if self.radiation_step_counter >= self.params['radiation_switch_steps']:
             self.radiation_step_counter = 0
+            old_wall = self.radioactive_wall
             if self.radioactive_wall == 'west':
                 self.radioactive_wall = 'east'
             else:
                 self.radioactive_wall = 'west'
+            print(f"RADIATION WALL SWITCHED: {old_wall} -> {self.radioactive_wall}")
 
             # Reset radiation levels
             self.grid.data[:, :, 3] = 0
@@ -88,7 +95,8 @@ class RadiationManager:
         Apply radiation effects to creatures.
         
         Creatures in higher radiation areas have a higher probability
-        of being killed by radiation.
+        of being killed by radiation. The radiation intensity parameter
+        scales the effect of radiation.
         
         Args:
             creatures: List of creatures to check for radiation effects
@@ -99,13 +107,32 @@ class RadiationManager:
         if not self.params['enable_radioactive_environment']:
             return []
 
+        # Print the number of creatures being checked
+        alive_creatures = [c for c in creatures if c.alive]
+        print(f"RADIATION CHECK: Checking {len(alive_creatures)} alive creatures for radiation effects")
+
+        # Get radiation intensity from parameters (default to 1.0 if not specified)
+        radiation_intensity = self.params.get('radiation_intensity', 1.0)
+        
         killed_creatures = []
         for creature in creatures:
+            if not creature.alive:
+                continue
+                
             x, y = int(creature.position[0]), int(creature.position[1])
             radiation_level = self.grid.data[x, y, 3]
 
+            # Scale radiation level by intensity
+            scaled_radiation_level = radiation_level * radiation_intensity
+            
             # Higher radiation level means higher chance of death
-            if radiation_level > 0 and random.random() < radiation_level:
+            if scaled_radiation_level > 0 and random.random() < scaled_radiation_level:
                 killed_creatures.append(creature)
+                # Print every radiation death
+                print(f"RADIATION DEATH: Creature {creature.id} killed at position ({x}, {y}) with radiation level {scaled_radiation_level:.2f}")
 
+        # Print summary of radiation deaths
+        if killed_creatures:
+            print(f"RADIATION SUMMARY: {len(killed_creatures)} creatures killed by radiation this step")
+            
         return killed_creatures

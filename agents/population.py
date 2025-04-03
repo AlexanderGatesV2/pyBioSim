@@ -142,8 +142,103 @@ class Population:
         # Get survivors based on challenge type
         survivors = []
         for creature in self.creatures:
-            passed, score = criteria.check_criterion(creature, self.params['challenge'])
-            if passed and creature.brain.connections:  # Must have valid neural connections
+            # Get the result from the criterion check
+            result = criteria.check_criterion(creature, self.params['challenge'])
+            passed, score = result
+            
+            # Check if the creature is in a safe zone based on the challenge type
+            in_safe_zone = False
+            if self.params['challenge'] == 0:  # CHALLENGE_CIRCLE
+                # Circle in the top-left quadrant
+                center_x = self.params['world_size'][0] // 4
+                center_y = self.params['world_size'][1] // 4
+                radius = self.params['world_size'][0] // 4
+                dx = creature.position[0] - center_x
+                dy = creature.position[1] - center_y
+                distance = math.sqrt(dx * dx + dy * dy)
+                in_safe_zone = distance <= radius
+            elif self.params['challenge'] == 1:  # CHALLENGE_RIGHT_HALF
+                # Right half of the arena
+                in_safe_zone = creature.position[0] > self.params['world_size'][0] // 2
+            elif self.params['challenge'] == 4:  # CHALLENGE_CENTER_WEIGHTED
+                # Circle in the center
+                center_x = self.params['world_size'][0] // 2
+                center_y = self.params['world_size'][1] // 2
+                radius = self.params['world_size'][0] // 3
+                dx = creature.position[0] - center_x
+                dy = creature.position[1] - center_y
+                distance = math.sqrt(dx * dx + dy * dy)
+                in_safe_zone = distance <= radius
+            elif self.params['challenge'] == 5:  # CHALLENGE_CORNER
+                # Corners of the arena
+                radius = self.params['world_size'][0] // 8
+                corners = [
+                    (0, 0),
+                    (0, self.params['world_size'][1] - 1),
+                    (self.params['world_size'][0] - 1, 0),
+                    (self.params['world_size'][0] - 1, self.params['world_size'][1] - 1)
+                ]
+                
+                for corner in corners:
+                    dx = creature.position[0] - corner[0]
+                    dy = creature.position[1] - corner[1]
+                    distance = math.sqrt(dx * dx + dy * dy)
+                    if distance <= radius:
+                        in_safe_zone = True
+                        break
+            elif self.params['challenge'] == 10:  # CHALLENGE_RADIOACTIVE_WALLS
+                # For radioactive walls challenge, check if creature is far enough from the radioactive wall
+                x = int(creature.position[0])
+                world_width = self.params['world_size'][0]
+                
+                # Determine which wall is radioactive based on current step
+                current_step = self.params.get('current_step', 0)
+                steps_per_generation = self.params.get('steps_per_generation', 100)
+                radioactive_x = 0 if current_step < steps_per_generation / 2 else world_width - 1
+                
+                # Calculate distance from radioactive wall
+                distance = abs(x - radioactive_x)
+                
+                # Only creatures that are far enough from the radioactive wall are in the safe zone
+                in_safe_zone = distance >= world_width / 3  # Increased from 1/4 to 1/3 to match survival_criteria.py
+            elif self.params['challenge'] == 8:  # CHALLENGE_CENTER_SPARSE
+                # For center sparse challenge, check if creature is near center with specific neighbor count
+                # This should match the logic in survival_criteria.py
+                safe_center = (self.params['world_size'][0] // 2, self.params['world_size'][1] // 2)
+                outer_radius = self.params['world_size'][0] // 4
+                inner_radius = 1.5
+                min_neighbors = 5  # Includes self
+                max_neighbors = 8
+                
+                # Check if within outer radius of center
+                x, y = int(creature.position[0]), int(creature.position[1])
+                offset = (x - safe_center[0], y - safe_center[1])
+                distance = math.sqrt(offset[0] ** 2 + offset[1] ** 2)
+                
+                if distance <= outer_radius:
+                    # Count neighbors within inner radius
+                    count = 0
+                    for dx in range(-int(inner_radius), int(inner_radius) + 1):
+                        for dy in range(-int(inner_radius), int(inner_radius) + 1):
+                            dist_sq = dx * dx + dy * dy
+                            if dist_sq <= inner_radius * inner_radius:
+                                nx = min(self.params['world_size'][0] - 1, max(0, x + dx))
+                                ny = min(self.params['world_size'][1] - 1, max(0, y + dy))
+                                
+                                if grid.data[nx, ny, 0] > 0:  # Contains a creature
+                                    count += 1
+                    
+                    # Check if the neighbor count is within the required range
+                    in_safe_zone = min_neighbors <= count <= max_neighbors
+                else:
+                    in_safe_zone = False
+            else:
+                # For other challenges, use the passed result directly
+                in_safe_zone = passed
+            
+            # Only count creatures that pass the criterion, are in a safe zone,
+            # and have valid neural connections
+            if passed and in_safe_zone and creature.brain.connections:
                 survivors.append((creature, score))
         
         # If no survivors but creatures are alive, check if they're in the right half
@@ -250,19 +345,41 @@ class Population:
             child_genome = parent1.genome.crossover(parent2.genome)
             child_genome.mutate(self.params['mutation_rate'])
 
-            # Create child creature
-            child = Creature(genome=child_genome, params=self.params)
+            # Create child creature with parent information
+            child = Creature(
+                genome=child_genome, 
+                params=self.params,
+                parent1_id=parent1.id,
+                parent2_id=parent2.id
+            )
             offspring.append(child)
 
         # Update generation counter
         self.generation += 1
 
         # Export parent genome information
-        self.export_parent_genomes(
-            [creature for creature, _ in survivors]  # List of parent creatures
-        )
+        parent_creatures = [creature for creature, _ in survivors]
+        self.export_parent_genomes(parent_creatures)
         
-        return offspring
+        # Count unique parents that contributed to reproduction
+        # This is a set of parent IDs that were used for reproduction
+        reproducer_ids = set()
+        
+        # We need to track which parents were actually used for reproduction
+        # This happens in the tournament selection process
+        # For simplicity, we'll consider all survivors as potential reproducers
+        # and count the actual number of unique parents used
+        
+        # Count survivors
+        survivors_count = len(survivors)
+        
+        # For reproduction count, we'll use the number of unique parents
+        # that contributed to the offspring (excluding elites)
+        reproduction_count = len(parent_creatures)
+        
+        print(f"Generation {self.generation}: {survivors_count} survivors, {reproduction_count} reproducers")
+        
+        return offspring, survivors_count, reproduction_count
 
     def tournament_selection(self, scored_creatures, tournament_size=5):
         """
@@ -372,7 +489,9 @@ class Population:
                     'Brain_Active_Neurons',
                     'Brain_Total_Connections',
                     'Genome_Length',
-                    'Genetic_Complexity_Score'
+                    'Genetic_Complexity_Score',
+                    'Parent1_ID',
+                    'Parent2_ID'
                 ]
 
                 # Add detailed gene information to header
@@ -405,7 +524,9 @@ class Population:
                         parent.brain.active_internal_neurons,
                         parent.brain.total_connections,
                         len(parent.genome.genes),
-                        f"{complexity_score:.4f}"
+                        f"{complexity_score:.4f}",
+                        parent.parent1_id if hasattr(parent, 'parent1_id') and parent.parent1_id is not None else "None",
+                        parent.parent2_id if hasattr(parent, 'parent2_id') and parent.parent2_id is not None else "None"
                     ]
 
                     # Add detailed gene information

@@ -47,8 +47,14 @@ class Logger:
                     'Avg_Connections_Used',
                     'Genetic_Diversity',
                     'Kills',
-                    'Selection_Method'
+                    'Selection_Method',
+                    'Survivors_Count',
+                    'Reproduction_Count'
                 ])
+                
+                # Initialize tracking variables for survivors and reproduction
+                self.survivors_count = 0
+                self.reproduction_count = 0
             except Exception as e:
                 print(f"Failed to create CSV log file: {e}")
                 self.file = None
@@ -112,10 +118,36 @@ class Logger:
             f"{avg_connections:.2f}",
             f"{genetic_diversity:.3f}",
             kills,
-            self.params['selection_method']
+            self.params['selection_method'],
+            self.survivors_count,
+            self.reproduction_count
         ])
         # Flush to ensure data is written
         self.file.flush()
+        
+        # Reset counters for next generation
+        self.survivors_count = 0
+        self.reproduction_count = 0
+
+    def record_survivors(self, survivors_count):
+        """
+        Record the number of survivors from the current generation.
+        
+        Args:
+            survivors_count: Number of creatures that survived selection
+        """
+        self.survivors_count = survivors_count
+        print(f"Recorded {survivors_count} survivors")
+    
+    def record_reproduction(self, reproduction_count):
+        """
+        Record the number of creatures that reproduced.
+        
+        Args:
+            reproduction_count: Number of creatures that reproduced
+        """
+        self.reproduction_count = reproduction_count
+        print(f"Recorded {reproduction_count} reproducers")
 
     def close(self):
         """

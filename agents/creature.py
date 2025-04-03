@@ -10,12 +10,12 @@ from utils.random_generator import random_generator
 from utils.logging_config import get_logger
 
 # Module-level logger
-logger = get_logger(__name__, log_file='creature_debug.log', console_level=logging.CRITICAL, file_level=logging.CRITICAL)
+logger = get_logger(__name__, log_file='creature_debug.log', console_level=logging.WARNING, file_level=logging.CRITICAL)
 
 class Creature:
     next_id = 1  # Class variable for unique IDs
 
-    def __init__(self, genome=None, position=None, params=None):
+    def __init__(self, genome=None, position=None, params=None, parent1_id=None, parent2_id=None):
         """
         Initialize a creature with a genome and position
 
@@ -23,6 +23,8 @@ class Creature:
             genome: The creature's genetic code (optional, random if None)
             position: Starting position (optional, random if None)
             params: Simulation parameters
+            parent1_id: ID of the first parent (optional)
+            parent2_id: ID of the second parent (optional)
         """
         self.id = Creature.next_id
         Creature.next_id += 1
@@ -30,6 +32,10 @@ class Creature:
         self.genome = genome if genome else Genome(length=params['genome_length'], params=params) # Pass params
         self.params = params
         self.alive = True
+        
+        # Track parent information
+        self.parent1_id = parent1_id
+        self.parent2_id = parent2_id
 
         # Ensure starting position is within bounds
         if position:
@@ -58,6 +64,264 @@ class Creature:
         self.energy = 1000  # Default energy value
         self.in_safe_zone = False
         self.has_killed = False
+        self.will_survive = False  # Flag to indicate if creature will survive at end of generation
+import numpy as np
+import logging
+import random
+import math
+
+from core.types import Action, Sensor, calculate_genetic_similarity
+from agents.neural_network import NeuralNetwork
+from agents.genome import Genome
+from utils.random_generator import random_generator
+from utils.logging_config import get_logger
+
+# Module-level logger
+logger = get_logger(__name__, log_file='creature_debug.log', console_level=logging.WARNING, file_level=logging.CRITICAL)
+
+class Creature:
+    next_id = 1  # Class variable for unique IDs
+
+    def __init__(self, genome=None, position=None, params=None, parent1_id=None, parent2_id=None):
+        """
+        Initialize a creature with a genome and position
+
+        Args:
+            genome: The creature's genetic code (optional, random if None)
+            position: Starting position (optional, random if None)
+            params: Simulation parameters
+            parent1_id: ID of the first parent (optional)
+            parent2_id: ID of the second parent (optional)
+        """
+        self.id = Creature.next_id
+        Creature.next_id += 1
+
+        self.genome = genome if genome else Genome(length=params['genome_length'], params=params) # Pass params
+        self.params = params
+        self.alive = True
+        
+        # Track parent information
+        self.parent1_id = parent1_id
+        self.parent2_id = parent2_id
+
+        # Ensure starting position is within bounds
+        if position:
+            self.position = (min(params['world_size'][0] - 1, max(0, position[0])),
+                             min(params['world_size'][1] - 1, max(0, position[1])))
+        else:
+            self.position = (random.randint(2, params['world_size'][0] - 3),
+                             random.randint(2, params['world_size'][1] - 3))
+
+        # Initialize direction with random uniform values using our generator
+        self.direction = (random_generator.random_float() * 2 - 1,
+                          random_generator.random_float() * 2 - 1)
+
+        # Calculate the magnitude of the direction vector
+        magnitude = math.sqrt(self.direction[0] ** 2 + self.direction[1] ** 2)
+        # Normalize the direction vector if the magnitude is greater than 0
+        if magnitude > 0:
+            self.direction = (self.direction[0] / magnitude, self.direction[1] / magnitude)
+        else:
+            # If the magnitude is 0, set to a random non-zero direction
+            angle = random.uniform(0, 2 * math.pi)  # Choose a random angle
+            self.direction = (math.cos(angle), math.sin(angle))
+
+import numpy as np
+import logging
+import random
+import math
+
+from core.types import Action, Sensor, calculate_genetic_similarity
+from agents.neural_network import NeuralNetwork
+from agents.genome import Genome
+from utils.random_generator import random_generator
+from utils.logging_config import get_logger
+
+# Module-level logger
+logger = get_logger(__name__, log_file='creature_debug.log', console_level=logging.WARNING, file_level=logging.CRITICAL)
+
+class Creature:
+    next_id = 1  # Class variable for unique IDs
+
+    def __init__(self, genome=None, position=None, params=None, parent1_id=None, parent2_id=None):
+        """
+        Initialize a creature with a genome and position
+
+        Args:
+            genome: The creature's genetic code (optional, random if None)
+            position: Starting position (optional, random if None)
+            params: Simulation parameters
+            parent1_id: ID of the first parent (optional)
+            parent2_id: ID of the second parent (optional)
+        """
+        self.id = Creature.next_id
+        Creature.next_id += 1
+
+        self.genome = genome if genome else Genome(length=params['genome_length'], params=params) # Pass params
+        self.params = params
+        self.alive = True
+        
+        # Track parent information
+        self.parent1_id = parent1_id
+        self.parent2_id = parent2_id
+
+        # Ensure starting position is within bounds
+        if position:
+            self.position = (min(params['world_size'][0] - 1, max(0, position[0])),
+                             min(params['world_size'][1] - 1, max(0, position[1])))
+        else:
+            self.position = (random.randint(2, params['world_size'][0] - 3),
+                             random.randint(2, params['world_size'][1] - 3))
+
+        # Initialize direction with random uniform values using our generator
+        self.direction = (random_generator.random_float() * 2 - 1,
+                          random_generator.random_float() * 2 - 1)
+
+        # Calculate the magnitude of the direction vector
+        magnitude = math.sqrt(self.direction[0] ** 2 + self.direction[1] ** 2)
+        # Normalize the direction vector if the magnitude is greater than 0
+        if magnitude > 0:
+            self.direction = (self.direction[0] / magnitude, self.direction[1] / magnitude)
+        else:
+            # If the magnitude is 0, set to a random non-zero direction
+            angle = random.uniform(0, 2 * math.pi)  # Choose a random angle
+            self.direction = (math.cos(angle), math.sin(angle))
+
+        # Creature state variables
+        # Removing age as it's not needed and not in biosim4
+        self.energy = 1000  # Default energy value
+        self.in_safe_zone = False
+        self.has_killed = False
+        self.will_survive = False  # Flag to indicate if creature will survive at end of generation
+        self.will_survive = False  # Flag to indicate if creature will survive at end of generation
+import numpy as np
+import logging
+import random
+import math
+
+from core.types import Action, Sensor, calculate_genetic_similarity
+from agents.neural_network import NeuralNetwork
+from agents.genome import Genome
+from utils.random_generator import random_generator
+from utils.logging_config import get_logger
+
+# Module-level logger
+logger = get_logger(__name__, log_file='creature_debug.log', console_level=logging.WARNING, file_level=logging.CRITICAL)
+
+class Creature:
+    next_id = 1  # Class variable for unique IDs
+
+    def __init__(self, genome=None, position=None, params=None, parent1_id=None, parent2_id=None):
+        """
+        Initialize a creature with a genome and position
+
+        Args:
+            genome: The creature's genetic code (optional, random if None)
+            position: Starting position (optional, random if None)
+            params: Simulation parameters
+            parent1_id: ID of the first parent (optional)
+            parent2_id: ID of the second parent (optional)
+        """
+        self.id = Creature.next_id
+        Creature.next_id += 1
+
+        self.genome = genome if genome else Genome(length=params['genome_length'], params=params) # Pass params
+        self.params = params
+        self.alive = True
+        
+        # Track parent information
+        self.parent1_id = parent1_id
+        self.parent2_id = parent2_id
+
+        # Ensure starting position is within bounds
+        if position:
+            self.position = (min(params['world_size'][0] - 1, max(0, position[0])),
+                             min(params['world_size'][1] - 1, max(0, position[1])))
+        else:
+            self.position = (random.randint(2, params['world_size'][0] - 3),
+                             random.randint(2, params['world_size'][1] - 3))
+
+        # Initialize direction with random uniform values using our generator
+        self.direction = (random_generator.random_float() * 2 - 1,
+                          random_generator.random_float() * 2 - 1)
+
+        # Calculate the magnitude of the direction vector
+        magnitude = math.sqrt(self.direction[0] ** 2 + self.direction[1] ** 2)
+        # Normalize the direction vector if the magnitude is greater than 0
+        if magnitude > 0:
+            self.direction = (self.direction[0] / magnitude, self.direction[1] / magnitude)
+        else:
+            # If the magnitude is 0, set to a random non-zero direction
+            angle = random.uniform(0, 2 * math.pi)  # Choose a random angle
+            self.direction = (math.cos(angle), math.sin(angle))
+
+import numpy as np
+import logging
+import random
+import math
+
+from core.types import Action, Sensor, calculate_genetic_similarity
+from agents.neural_network import NeuralNetwork
+from agents.genome import Genome
+from utils.random_generator import random_generator
+from utils.logging_config import get_logger
+
+# Module-level logger
+logger = get_logger(__name__, log_file='creature_debug.log', console_level=logging.WARNING, file_level=logging.CRITICAL)
+
+class Creature:
+    next_id = 1  # Class variable for unique IDs
+
+    def __init__(self, genome=None, position=None, params=None, parent1_id=None, parent2_id=None):
+        """
+        Initialize a creature with a genome and position
+
+        Args:
+            genome: The creature's genetic code (optional, random if None)
+            position: Starting position (optional, random if None)
+            params: Simulation parameters
+            parent1_id: ID of the first parent (optional)
+            parent2_id: ID of the second parent (optional)
+        """
+        self.id = Creature.next_id
+        Creature.next_id += 1
+
+        self.genome = genome if genome else Genome(length=params['genome_length'], params=params) # Pass params
+        self.params = params
+        self.alive = True
+        
+        # Track parent information
+        self.parent1_id = parent1_id
+        self.parent2_id = parent2_id
+
+        # Ensure starting position is within bounds
+        if position:
+            self.position = (min(params['world_size'][0] - 1, max(0, position[0])),
+                             min(params['world_size'][1] - 1, max(0, position[1])))
+        else:
+            self.position = (random.randint(2, params['world_size'][0] - 3),
+                             random.randint(2, params['world_size'][1] - 3))
+
+        # Initialize direction with random uniform values using our generator
+        self.direction = (random_generator.random_float() * 2 - 1,
+                          random_generator.random_float() * 2 - 1)
+
+        # Calculate the magnitude of the direction vector
+        magnitude = math.sqrt(self.direction[0] ** 2 + self.direction[1] ** 2)
+        # Normalize the direction vector if the magnitude is greater than 0
+        if magnitude > 0:
+            self.direction = (self.direction[0] / magnitude, self.direction[1] / magnitude)
+        else:
+            # If the magnitude is 0, set to a random non-zero direction
+            angle = random.uniform(0, 2 * math.pi)  # Choose a random angle
+            self.direction = (math.cos(angle), math.sin(angle))
+
+        # Creature state variables
+        # Removing age as it's not needed and not in biosim4
+        self.energy = 1000  # Default energy value
+        self.in_safe_zone = False
+        self.has_killed = False
+        self.challengeBits = False  # Track if creature has touched a wall during lifetime
 
         # Enhanced state tracking for more complex behaviors
         self.birth_position = self.position  # Track where creature was born
@@ -210,11 +474,11 @@ class Creature:
                 end_x = self.params['world_size'][0] // 8
                 self.in_safe_zone = self.position[0] < end_x
                 
-            elif challenge_type == 4 or challenge_type == 8:  # CHALLENGE_CENTER_WEIGHTED or CHALLENGE_CENTER_SPARSE
+            elif challenge_type == 4 or challenge_type == 19 or challenge_type == 8:  # CHALLENGE_CENTER_WEIGHTED or CHALLENGE_CENTER_UNWEIGHTED or CHALLENGE_CENTER_SPARSE
                 # Circle in the center
                 center_x = self.params['world_size'][0] // 2
                 center_y = self.params['world_size'][1] // 2
-                radius = self.params['world_size'][0] // 3 if challenge_type == 4 else self.params['world_size'][0] // 4
+                radius = self.params['world_size'][0] // 3 if challenge_type == 4 or challenge_type == 19 else self.params['world_size'][0] // 4
                 dx = self.position[0] - center_x
                 dy = self.position[1] - center_y
                 distance = math.sqrt(dx * dx + dy * dy)
@@ -359,11 +623,11 @@ class Creature:
                 end_x = self.params['world_size'][0] // 8
                 self.in_safe_zone = self.position[0] < end_x
                 
-            elif challenge_type == 4 or challenge_type == 8:  # CHALLENGE_CENTER_WEIGHTED or CHALLENGE_CENTER_SPARSE
+            elif challenge_type == 4 or challenge_type == 19 or challenge_type == 8:  # CHALLENGE_CENTER_WEIGHTED or CHALLENGE_CENTER_UNWEIGHTED or CHALLENGE_CENTER_SPARSE
                 # Circle in the center
                 center_x = self.params['world_size'][0] // 2
                 center_y = self.params['world_size'][1] // 2
-                radius = self.params['world_size'][0] // 3 if challenge_type == 4 else self.params['world_size'][0] // 4
+                radius = self.params['world_size'][0] // 3 if challenge_type == 4 or challenge_type == 19 else self.params['world_size'][0] // 4
                 dx = self.position[0] - center_x
                 dy = self.position[1] - center_y
                 distance = math.sqrt(dx * dx + dy * dy)

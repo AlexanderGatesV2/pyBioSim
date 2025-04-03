@@ -114,6 +114,33 @@ python main.py --config custom_config.json
 -  **R**: Reset simulation (when paused)
 -  **F1**: Toggle help display
 
+### Challenges
+
+The simulation includes various environmental challenges that determine which creatures survive and reproduce:
+
+-  **Circle Challenge (0)**: Creatures must stay inside a circular area in the top-left quadrant.
+-  **Right Half (1)**: Creatures must stay in the right half of the arena.
+-  **Right Quarter (2)**: Creatures must stay in the rightmost quarter of the arena.
+-  **String (3)**: Creatures must have 2-3 neighbors within a radius of 1.5 cells.
+-  **Center Weighted (4)**: Creatures must stay near the center, with higher scores for those closer to center.
+-  **Center Unweighted (19)**: Creatures must stay near the center, with equal scores for all survivors.
+-  **Corner (5)**: Creatures must stay near any corner of the arena.
+-  **Corner Weighted (6)**: Creatures must stay near any corner, with higher scores for those closer to corners.
+-  **Migrate Distance (7)**: Creatures are scored based on distance traveled from birth position.
+-  **Center Sparse (8)**: Creatures must stay near center with a specific neighbor count.
+-  **Left Eighth (9)**: Creatures must stay in the leftmost eighth of the arena.
+-  **Radioactive Walls (10)**: Creatures must avoid walls that become radioactive.
+-  **Against Any Wall (11)**: Creatures must touch any wall of the arena.
+-  **Touch Any Wall (12)**: Creatures must have touched a wall during their lifetime.
+-  **East West Eighths (13)**: Creatures must stay in the leftmost or rightmost eighth.
+-  **Near Barrier (14)**: Creatures must stay near barriers.
+-  **Pairs (15)**: Creatures must form exclusive pairs with specific neighbor configuration.
+-  **Location Sequence (16)**: Creatures are scored based on number of locations visited.
+-  **Altruism (17)**: Creatures in the northwest safe zone have higher scores.
+-  **Altruism Sacrifice (18)**: Creatures in the northeast sacrifice zone are selected for kinship-based reproduction.
+
+**Recent Fix**: The Center Unweighted challenge constant was changed from 4 to 19 to fix an issue where both Center Weighted and Center Unweighted challenges were using the same constant value (4). This ensures that the two different challenge types can be properly distinguished in the code.
+
 ### Kill Counter
 
 The simulation includes a kill counter feature that tracks how many creatures are killed during each generation. This feature works when the kill neuron is enabled in your configuration.

@@ -4,6 +4,7 @@ import pygame
 from core.simulator import Simulator
 from visualization.renderer import GridRenderer, CreatureRenderer
 from visualization.challenge_renderer import ChallengeRenderer
+from visualization.creature_lineage import CreatureLineageLogger
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -158,22 +159,22 @@ class InteractiveSimulator(Simulator):
                 
                 # Barrier type keys (0-3)
                 elif event.key == pygame.K_0:
-                    self.params['barrierType'] = 0
+                    self.params['barrier_type'] = 0
                     self.grid.reset()  # Clear existing barriers
                     self.barrier_manager.create_barriers(0)
                     # logger.info("Barrier type set to 0: None")
                 elif event.key == pygame.K_1:
-                    self.params['barrierType'] = 1
+                    self.params['barrier_type'] = 1
                     self.grid.reset()  # Clear existing barriers
                     self.barrier_manager.create_barriers(1)
                     # logger.info("Barrier type set to 1: Vertical bar in center")
                 elif event.key == pygame.K_2:
-                    self.params['barrierType'] = 2
+                    self.params['barrier_type'] = 2
                     self.grid.reset()  # Clear existing barriers
                     self.barrier_manager.create_barriers(2)
                     # logger.info("Barrier type set to 2: Vertical bar in random location")
                 elif event.key == pygame.K_3:
-                    self.params['barrierType'] = 3
+                    self.params['barrier_type'] = 3
                     self.grid.reset()  # Clear existing barriers
                     self.barrier_manager.create_barriers(3)
                     # logger.info("Barrier type set to 3: Five staggered blocks")
@@ -214,16 +215,20 @@ class InteractiveSimulator(Simulator):
         return self.running, self.paused
 
     def create_zone(self, pos):
-        """Create a zone at the specified position using ZoneManager"""
-        # Use the ZoneManager to create the zone
-        self.zone_manager.create_zone(pos, self.zone_size, self.zone_type)
-        # logger.info(f"Created {'safe' if self.zone_type == 1 else 'hazard'} zone at {pos} with size {self.zone_size}")
+        """
+        This method is kept for backward compatibility but doesn't create zones anymore
+        since we're using different methods for reproduction selection
+        """
+        # We're not using zones anymore
+        logger.info("Zone creation is disabled - using different methods for reproduction selection")
 
     def create_directional_zone(self, direction):
-        """Create a directional zone using ZoneManager"""
-        # Use the ZoneManager to create the directional zone
-        self.zone_manager.create_directional_zone(direction, self.directional_percentage, self.zone_type)
-        # logger.info(f"Created {'safe' if self.zone_type == 1 else 'hazard'} directional zone ({direction}) with {self.directional_percentage}%")
+        """
+        This method is kept for backward compatibility but doesn't create zones anymore
+        since we're using different methods for reproduction selection
+        """
+        # We're not using zones anymore
+        logger.info("Zone creation is disabled - using different methods for reproduction selection")
         
     def _delete_log_files(self):
         """Delete log files from previous runs"""
@@ -304,7 +309,7 @@ class InteractiveSimulator(Simulator):
                 "1: Vertical bar in center",
                 "2: Vertical bar in random location",
                 "3: Five staggered blocks",
-                f"Current barrier type: {self.params.get('barrierType', 0)}",
+                f"Current barrier type: {self.params.get('barrier_type', 0)}",
                 "",
                 "Generation Control:",
                 "G: Force new generation (when paused)",
@@ -369,8 +374,30 @@ class InteractiveSimulator(Simulator):
         # Log generation stats
         self.logger.log_generation(self.generation, self.population.creatures, self.murder_count)
 
+        # Count how many creatures will survive the radioactive walls challenge
+        if self.params.get('challenge', 0) == 10:  # CHALLENGE_RADIOACTIVE_WALLS
+            survivors_before_selection = 0
+            for creature in self.population.creatures:
+                if creature.alive:
+                    result = self.survival_criteria.check_criterion(creature, 10)
+                    if result[0]:  # If the creature passes the survival criterion
+                        survivors_before_selection += 1
+            print(f"Generation {self.generation}: {survivors_before_selection} creatures pass the radioactive walls challenge")
+
         # Perform natural selection
-        self.population.creatures = self.population.natural_selection_tournament(self.grid)
+        new_creatures, survivors_count, reproduction_count = self.population.natural_selection_tournament(self.grid)
+        
+        # Record survivors and reproduction counts in the logger
+        if hasattr(self.logger, 'record_survivors'):
+            self.logger.record_survivors(survivors_count)
+        if hasattr(self.logger, 'record_reproduction'):
+            self.logger.record_reproduction(reproduction_count)
+        
+        # Replace current population with new generation
+        self.population.creatures = new_creatures
+        
+        # Log lineage information for the new generation
+        self.lineage_logger.log_generation(self.generation, new_creatures)
 
         # Increment generation counter and reset step counter
         self.generation += 1
@@ -379,6 +406,11 @@ class InteractiveSimulator(Simulator):
 
         # Place new generation on the grid using the optimized approach
         self._place_new_generation_optimized()
+        
+        # Check if we've reached the maximum number of generations
+        if 'max_generations' in self.params and self.generation >= self.params['max_generations']:
+            print(f"Reached maximum number of generations ({self.params['max_generations']}). Simulation complete.")
+            self.running = False
     
     def _place_new_generation_optimized(self):
         """Optimized version of placing new generation on the grid"""
@@ -493,8 +525,8 @@ class InteractiveSimulator(Simulator):
         # Create our custom renderer that doesn't rely on existing pygame surfaces
         self.custom_renderer = CustomRenderer(self.params)
         
-        # Enable challenge highlighting by default for RIGHT_HALF challenge
-        if self.params.get('challenge', 0) == 1:  # CHALLENGE_RIGHT_HALF
+        # Enable challenge highlighting by default for certain challenges
+        if self.params.get('challenge', 0) in [1, 14]:  # CHALLENGE_RIGHT_HALF or CHALLENGE_NEAR_BARRIER
             self.params['show_challenge_areas'] = True
 
         # Initialize simulation
@@ -520,5 +552,6 @@ class InteractiveSimulator(Simulator):
             # Clean up when simulation ends
             pygame.quit()
             self.logger.close()
+            self.lineage_logger.close()
 
 __all__ = ['InteractiveSimulator']

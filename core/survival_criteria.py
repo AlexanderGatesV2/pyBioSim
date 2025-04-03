@@ -6,7 +6,7 @@ CHALLENGE_RIGHT_HALF = 1          # Survive in right half of arena
 CHALLENGE_RIGHT_QUARTER = 2       # Survive in right quarter of arena
 CHALLENGE_STRING = 3              # Survive with specific number of neighbors
 CHALLENGE_CENTER_WEIGHTED = 4     # Survive near center, weighted by distance
-CHALLENGE_CENTER_UNWEIGHTED = 4   # Survive near center, equal weighting
+CHALLENGE_CENTER_UNWEIGHTED = 19  # Survive near center, equal weighting
 CHALLENGE_CENTER_SPARSE = 8       # Survive near center with specific neighbor count
 CHALLENGE_CORNER = 5              # Survive near any corner
 CHALLENGE_CORNER_WEIGHTED = 6     # Survive near any corner, weighted by distance
@@ -105,14 +105,26 @@ class SurvivalCriteria:
         # Calculate a score that favors creatures with higher energy
         fallback_score = energy_factor
         
+        # Special case for CHALLENGE_MIGRATE_DISTANCE
+        # Always use the original distance-based score, even if the creature didn't pass
+        if challenge_type == CHALLENGE_MIGRATE_DISTANCE:
+            # For migration challenge, we always want to use the distance-based score
+            # even if the creature didn't pass the criterion
+            return (result[0], result[1])
+        
         # If the creature passed the original criterion, return that result
         if result[0]:
             return result
         else:
-            # Otherwise, allow creatures with high energy to survive as a fallback
-            # This ensures at least some creatures survive each generation
-            fallback_survival = energy_factor > 0.5  # Creatures with >50% energy survive
-            return (fallback_survival, fallback_score)
+            # For certain challenges, don't use the fallback mechanism
+            # Only creatures that meet the specific criteria should survive
+            if challenge_type in [CHALLENGE_PAIRS, CHALLENGE_NEAR_BARRIER, CHALLENGE_EAST_WEST_EIGHTHS, CHALLENGE_TOUCH_ANY_WALL, CHALLENGE_AGAINST_ANY_WALL, CHALLENGE_LEFT_EIGHTH, CHALLENGE_CORNER_WEIGHTED, CHALLENGE_CENTER_SPARSE, CHALLENGE_CENTER_UNWEIGHTED]:
+                return (False, fallback_score)
+            else:
+                # Otherwise, allow creatures with high energy to survive as a fallback
+                # This ensures at least some creatures survive each generation
+                fallback_survival = energy_factor > 0.5  # Creatures with >50% energy survive
+                return (fallback_survival, fallback_score)
 
     def challenge_circle(self, creature):
         """
@@ -241,31 +253,38 @@ class SurvivalCriteria:
         safe_center = (self.params['world_size'][0] // 2, self.params['world_size'][1] // 2)
         outer_radius = self.params['world_size'][0] // 4
         inner_radius = 1.5
-        min_neighbors = 5  # Includes self
-        max_neighbors = 8
+        min_neighbors = 1  # Includes self
+        max_neighbors = 3
 
         # Check if within outer radius
         x, y = int(creature.position[0]), int(creature.position[1])
         offset = (x - safe_center[0], y - safe_center[1])
         distance = math.sqrt(offset[0] ** 2 + offset[1] ** 2)
 
-        if distance <= outer_radius:
-            # Count neighbors within inner radius
-            count = 0
-            for dx in range(-int(inner_radius), int(inner_radius) + 1):
-                for dy in range(-int(inner_radius), int(inner_radius) + 1):
-                    dist_sq = dx * dx + dy * dy
-                    if dist_sq <= inner_radius * inner_radius:
-                        nx = min(self.params['world_size'][0] - 1, max(0, x + dx))
-                        ny = min(self.params['world_size'][1] - 1, max(0, y + dy))
+        # First check: Must be within outer radius of center
+        if distance > outer_radius:
+            return (False, 0.0)
+            
+        # Second check: Must have the right number of neighbors
+        # Count neighbors within inner radius
+        count = 0
+        for dx in range(-int(inner_radius), int(inner_radius) + 1):
+            for dy in range(-int(inner_radius), int(inner_radius) + 1):
+                dist_sq = dx * dx + dy * dy
+                if dist_sq <= inner_radius * inner_radius:
+                    nx = min(self.params['world_size'][0] - 1, max(0, x + dx))
+                    ny = min(self.params['world_size'][1] - 1, max(0, y + dy))
 
-                        if self.grid.data[nx, ny, 0] > 0:  # Contains a creature
-                            count += 1
+                    if self.grid.data[nx, ny, 0] > 0:  # Contains a creature
+                        count += 1
 
-            if min_neighbors <= count <= max_neighbors:
-                return (True, 1.0)
-
-        return (False, 0.0)
+        # Check if the neighbor count is within the required range
+        if min_neighbors <= count <= max_neighbors:
+            # Calculate score based on distance from center (closer is better)
+            score = 1.0 - (distance / outer_radius)
+            return (True, score)
+        else:
+            return (False, 0.0)
 
     def challenge_corner(self, creature):
         """
@@ -323,9 +342,35 @@ class SurvivalCriteria:
         """
         Radioactive walls challenge - creatures die if they touch walls.
         This is primarily handled in the simulator's step function.
-        All survivors receive equal score.
+        Only creatures that are alive and far from radioactive walls survive.
         """
-        return (True, 1.0)
+        if not creature.alive:
+            return (False, 0.0)
+            
+        # Check if creature is too close to the walls
+        x = int(creature.position[0])
+        world_width = self.params['world_size'][0]
+        
+        # Determine which wall is radioactive based on current step
+        # During the first half of the generation, the west wall is radioactive.
+        # In the second half, the east wall is radioactive.
+        current_step = self.params.get('current_step', 0)
+        steps_per_generation = self.params.get('steps_per_generation', 100)
+        radioactive_x = 0 if current_step < steps_per_generation / 2 else world_width - 1
+        
+        # Calculate distance from radioactive wall
+        distance = abs(x - radioactive_x)
+        
+        # Only creatures that are far enough from the radioactive wall survive
+        # The further away, the higher the score
+        if distance < world_width / 3:  # Too close to radioactive wall (increased from 1/4 to 1/3)
+            return (False, 0.0)
+        else:
+            # Score is better the further from the radioactive wall
+            # Normalize to 0.0-1.0 range
+            max_distance = world_width / 2
+            score = min(1.0, distance / max_distance)
+            return (True, score)
 
     def challenge_against_any_wall(self, creature):
         """
@@ -353,7 +398,7 @@ class SurvivalCriteria:
 
     def challenge_migrate_distance(self, creature):
         """
-        All creatures survive, but are scored by distance traveled from birth location.
+        Only creatures that traveled the longest distance survive.
         Score is normalized by the maximum possible distance in the arena.
         """
         dx = creature.position[0] - creature.birth_position[0]
@@ -364,7 +409,20 @@ class SurvivalCriteria:
         max_distance = max(self.params['world_size'][0], self.params['world_size'][1])
         score = distance / max_distance
 
-        return (True, score)
+        # Get the current step and steps per generation from params
+        current_step = self.params.get('current_step', 0)
+        steps_per_generation = self.params.get('steps_per_generation', 100)
+        
+        # Only return True for survival at the end of the generation
+        # This ensures we're evaluating based on the final distance traveled
+        if current_step >= steps_per_generation - 1:
+            # The score is already calculated based on distance traveled
+            # We'll let the natural selection process in population.py handle
+            # selecting the creatures with the highest scores
+            return (False, score)
+        else:
+            # During the generation, all creatures survive so they can continue moving
+            return (True, score)
 
     def challenge_east_west_eighths(self, creature):
         """
@@ -381,25 +439,33 @@ class SurvivalCriteria:
 
     def challenge_near_barrier(self, creature):
         """
-        Survivors are those within a radius of any barrier center.
-        Score is higher for creatures closer to a barrier center.
+        Survivors are those within 1-3 grid cells of any barrier.
+        Score is higher for creatures closer to a barrier.
         """
-        radius = self.params['world_size'][0] // 2
-        x, y = creature.position
-
-        # Find nearest barrier center
-        min_distance = float('inf')
-        for center in self.grid.barrier_centers:
-            dx = x - center[0]
-            dy = y - center[1]
-            distance = math.sqrt(dx * dx + dy * dy)
-            min_distance = min(min_distance, distance)
-
-        if min_distance <= radius:
-            score = 1.0 - (min_distance / radius)
-            return (True, score)
-        else:
+        # Define the proximity range (1-3 cells)
+        proximity_range = 3
+        x, y = int(creature.position[0]), int(creature.position[1])
+        
+        # Check if creature is along the world border
+        is_border = (x <= 1 or x >= self.params['world_size'][0] - 2 or 
+                     y <= 1 or y >= self.params['world_size'][1] - 2)
+        
+        # If creature is along the world border, it's not a survivor
+        if is_border:
             return (False, 0.0)
+
+        # Check if creature is near any barrier
+        for bx, by in self.grid.barrier_locations:
+            # Calculate Manhattan distance to barrier
+            distance = abs(x - bx) + abs(y - by)
+            
+            if distance <= proximity_range:
+                # Score is better the closer to barrier (normalized to 0-1)
+                score = 1.0 - (distance / proximity_range)
+                return (True, score)
+                
+        # Not near any barrier
+        return (False, 0.0)
 
     def challenge_pairs(self, creature):
         """

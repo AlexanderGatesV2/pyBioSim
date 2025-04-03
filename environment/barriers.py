@@ -35,6 +35,11 @@ class BarrierManager:
 
         # Helper function to draw a barrier directly to grid data
         def draw_barrier(min_x, min_y, max_x, max_y):
+            # Calculate center of this barrier for barrier_centers
+            center_x = (min_x + max_x) // 2
+            center_y = (min_y + max_y) // 2
+            self.grid.barrier_centers.append((center_x, center_y))
+            
             for x in range(min_x, max_x + 1):
                 for y in range(min_y, max_y + 1):
                     if 0 <= x < self.grid.size[0] and 0 <= y < self.grid.size[1]:
@@ -65,6 +70,11 @@ class BarrierManager:
 
             # Helper function to draw a block directly to grid data
             def draw_box(min_x, min_y, max_x, max_y):
+                # Calculate center of this box for barrier_centers
+                center_x = (min_x + max_x) // 2
+                center_y = (min_y + max_y) // 2
+                self.grid.barrier_centers.append((center_x, center_y))
+                
                 for x in range(min_x, max_x + 1):
                     for y in range(min_y, max_y + 1):
                         if 0 <= x < self.grid.size[0] and 0 <= y < self.grid.size[1]:

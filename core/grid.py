@@ -267,6 +267,7 @@ class Grid:
         """
         if creature_id not in self.death_queue:
             self.death_queue.append(creature_id)
+            print(f"DEATH QUEUE: Creature {creature_id} queued for death")
 
     def queue_for_move(self, creature_id, new_pos):
         """
@@ -404,6 +405,10 @@ class Grid:
             
             # Set new position in grid
             self.data[new_x, new_y, 0] = creature_id
+            
+            # Check if creature is touching a wall and update challengeBits
+            if new_x == 0 or new_x == self.size[0] - 1 or new_y == 0 or new_y == self.size[1] - 1:
+                creature.challengeBits = True
             
             # Update creature's stuck counter if needed
             if hasattr(creature, 'stuck_counter'):

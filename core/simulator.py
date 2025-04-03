@@ -13,6 +13,7 @@ from environment.radiation import RadiationManager
 from utils.random_generator import random_generator
 from visualization.renderer import Renderer
 from visualization.logger import Logger
+from visualization.creature_lineage import CreatureLineageLogger
 from core.survival_criteria import SurvivalCriteria, CHALLENGE_RADIOACTIVE_WALLS, CHALLENGE_TOUCH_ANY_WALL, \
     CHALLENGE_LOCATION_SEQUENCE, CHALLENGE_ALTRUISM_SACRIFICE, CHALLENGE_ALTRUISM
 
@@ -38,6 +39,7 @@ class Simulator:
         self.radiation_manager = RadiationManager(grid, params)
         self.renderer = Renderer(params)
         self.logger = Logger(params)
+        self.lineage_logger = CreatureLineageLogger(params)
 
         # Create survival criteria checker
         self.survival_criteria = SurvivalCriteria(params, grid)
@@ -62,28 +64,13 @@ class Simulator:
         self.grid.reset()
 
         # Create barriers
-        self.barrier_manager.create_barriers(self.params.get('barrierType', 0))
+        self.barrier_manager.create_barriers(self.params.get('barrier_type', 0))
 
         # Clear any existing zones first
         self.zone_manager.clear_zones()
         
-        # Create zones based on challenge type
-        challenge_type = self.params.get('challenge', 0)
-        
-        # Only create actual zones for specific challenge types
-        # For most challenges, we'll rely on the challenge highlighting and creature detection
-        if challenge_type == 9:  # CHALLENGE_LEFT_EIGHTH
-            self.zone_manager.create_directional_zone('left', 12.5, 1)  # 12.5% of the map, safe zone (type 1)
-        elif challenge_type in [0, 1, 2, 4, 5, 6, 8, 13, 17]:
-            # These challenges are handled by challenge highlighting and creature detection:
-            # CHALLENGE_CIRCLE, CHALLENGE_RIGHT_HALF, CHALLENGE_RIGHT_QUARTER,
-            # CHALLENGE_CENTER_WEIGHTED, CHALLENGE_CENTER_UNWEIGHTED, CHALLENGE_CENTER_SPARSE,
-            # CHALLENGE_CORNER, CHALLENGE_CORNER_WEIGHTED, CHALLENGE_EAST_WEST_EIGHTHS,
-            # CHALLENGE_ALTRUISM
-            pass
-        else:
-            # For other challenges, place random zones
-            self.zone_manager.place_random_zones()
+        # We're not using zones anymore for reproduction selection
+        # All challenges are handled by challenge highlighting and creature detection
 
         # Setup radiation if enabled
         if self.params.get('enable_radioactive_environment', False):
@@ -125,6 +112,14 @@ class Simulator:
             if creature.alive:
                 # Pass the current simulation step to the creature update
                 creature.update(self.grid, self.population.creatures, self.signals, self.step)
+                
+                # Check if creature will survive based on the current challenge
+                result = self.survival_criteria.check_criterion(
+                    creature, self.params.get('challenge', 0))
+                creature.will_survive = result[0]
+            else:
+                # Ensure dead creatures are marked as not surviving
+                creature.will_survive = False
 
         # Debug code to verify creatures are detecting zones
         safe_creatures = sum(1 for c in self.population.creatures if c.in_safe_zone)
@@ -169,8 +164,10 @@ class Simulator:
 
         # Update radiation if enabled
         if self.params.get('enable_radioactive_environment', False):
+            print("RADIATION UPDATE: Updating radiation environment")
             self.radiation_manager.update_radiation()
-            self.radiation_manager.apply_radiation_effects(self.population.creatures)
+            killed_creatures = self.radiation_manager.apply_radiation_effects(self.population.creatures)
+            print(f"RADIATION RESULT: {len(killed_creatures)} creatures killed by radiation")
 
         # Debug output to verify creatures are alive at the end of the update
         alive_count = sum(1 for c in self.population.creatures if c.alive)
@@ -209,9 +206,18 @@ class Simulator:
 
                     # Only apply within half the arena width
                     if distance < self.params['world_size'][0] / 2:
-                        # Chance of death increases closer to wall
-                        chance_of_death = 1.0 / distance if distance > 0 else 1.0
+                        # Chance of death increases closer to wall and with higher radiation intensity
+                        radiation_intensity = self.params.get('radiation_intensity', 1.0)
+                        chance_of_death = radiation_intensity * (1.0 / distance if distance > 0 else 1.0)
+                        
+                        # Print debug info more frequently
+                        if self.step % 20 == 0 and distance < self.params['world_size'][0] / 6:  # Very close to the wall
+                            print(f"RADIATION WARNING: Creature {creature.id} at distance {distance} from radioactive wall, chance of death: {chance_of_death:.2f}")
+                        
                         if random_generator.random_float() < chance_of_death:
+                            # Print death messages more frequently
+                            if self.step % 5 == 0:
+                                print(f"RADIATION DEATH: Creature {creature.id} died from radiation at distance {distance}")
                             self.grid.queue_for_death(creature.id)
 
         # CHALLENGE_TOUCH_ANY_WALL
@@ -260,15 +266,30 @@ class Simulator:
 
         # Use the population's natural selection method to create the next generation
         # This handles survival criteria, selection, and reproduction
-        new_creatures = self.population.natural_selection_tournament(self.grid)
+        new_creatures, survivors_count, reproduction_count = self.population.natural_selection_tournament(self.grid)
+        
+        # Record survivors and reproduction counts in the logger
+        if hasattr(self.logger, 'record_survivors'):
+            self.logger.record_survivors(survivors_count)
+        if hasattr(self.logger, 'record_reproduction'):
+            self.logger.record_reproduction(reproduction_count)
         
         # Replace current population with new generation
         self.population.creatures = new_creatures
+        
+        # Log lineage information for the new generation
+        self.lineage_logger.log_generation(self.generation, new_creatures)
 
         # Increment generation counter and reset step
         self.generation += 1
         self.step = 0
         self.murder_count = 0
+
+        # Check if we've reached the maximum number of generations
+        if 'max_generations' in self.params and self.generation >= self.params['max_generations']:
+            print(f"Reached maximum number of generations ({self.params['max_generations']}). Simulation complete.")
+            self.running = False
+            return
 
         # Clear the grid and place new creatures
         self._place_new_generation()
@@ -597,4 +618,5 @@ class Simulator:
         finally:
             # Clean up when simulation ends
             self.logger.close()
+            self.lineage_logger.close()
             pygame.quit()

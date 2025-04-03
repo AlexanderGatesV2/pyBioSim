@@ -233,15 +233,44 @@ class ChallengeRenderer:
         scale = self.display_scale
         color = self.challenge_colors['safe'] + (transparency,)  # Add transparency
         
-        # Calculate the radius
-        radius = grid.size[0] // 2
+        # Define the proximity range (1-3 cells) - same as in survival_criteria.py
+        proximity_range = 3
         
-        # Draw circles around each barrier center
-        for center in grid.barrier_centers:
-            pygame.draw.circle(
+        # Draw rectangles around each barrier
+        for bx, by in grid.barrier_locations:
+            # Draw a rectangle around this barrier cell
+            pygame.draw.rect(
                 screen, color,
-                (center[0] * scale, center[1] * scale), radius * scale
+                ((bx - proximity_range) * scale, 
+                 (by - proximity_range) * scale, 
+                 (proximity_range * 2 + 1) * scale, 
+                 (proximity_range * 2 + 1) * scale)
             )
+            
+        # Draw a border around the world to indicate that creatures near borders won't survive
+        border_color = self.challenge_colors['hazard'] + (transparency,)  # Red with transparency
+        border_width = 0  # Width of the border in cells
+        
+        # Top border
+        pygame.draw.rect(
+            screen, border_color,
+            (0, 0, grid.size[0] * scale, border_width * scale)
+        )
+        # Bottom border
+        pygame.draw.rect(
+            screen, border_color,
+            (0, (grid.size[1] - border_width) * scale, grid.size[0] * scale, border_width * scale)
+        )
+        # Left border
+        pygame.draw.rect(
+            screen, border_color,
+            (0, 0, border_width * scale, grid.size[1] * scale)
+        )
+        # Right border
+        pygame.draw.rect(
+            screen, border_color,
+            ((grid.size[0] - border_width) * scale, 0, border_width * scale, grid.size[1] * scale)
+        )
 
     def _render_radioactive_walls(self, screen, grid, transparency, params):
         """Render the radioactive walls"""
@@ -307,6 +336,7 @@ class ChallengeRenderer:
             CHALLENGE_TOUCH_ANY_WALL: "Touch Any Wall",
             CHALLENGE_EAST_WEST_EIGHTHS: "East/West Eighths",
             CHALLENGE_NEAR_BARRIER: "Near Barriers",
+            CHALLENGE_PAIRS: "Pairs",
             CHALLENGE_ALTRUISM: "Altruism",
             CHALLENGE_ALTRUISM_SACRIFICE: "Altruism Sacrifice",
         }

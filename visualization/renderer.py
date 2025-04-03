@@ -24,25 +24,16 @@ class GridRenderer:
     
     def render_grid(self, screen, grid, params=None):
         """
-        Render the grid with zones and barriers
+        Render the grid with barriers
         
         Args:
             screen: The pygame surface to render on
-            grid: The grid object containing zone and barrier data
+            grid: The grid object containing barrier data
             params: Optional parameters for additional rendering options
         """
         scale = self.display_scale
         
-        # Draw zones
-        for x in range(grid.size[0]):
-            for y in range(grid.size[1]):
-                zone_type = grid.get_zone_type(x, y)
-                if zone_type == 1:  # Safe zone
-                    pygame.draw.rect(screen, (0, 180, 0, 64),
-                                     (x * scale, y * scale, scale, scale))  # Green for safe
-                elif zone_type == 2:  # Hazardous zone
-                    pygame.draw.rect(screen, (180, 0, 0, 64),
-                                     (x * scale, y * scale, scale, scale))  # Red for hazardous
+        # We're not rendering zones anymore since we're using different methods for reproduction selection
         
         # Draw radiation (if enabled and params provided)
         if params and params.get('enable_radioactive_environment', False):
@@ -130,8 +121,14 @@ class CreatureRenderer:
                                    (screen_x, screen_y),
                                    size)
                 
+                # Draw yellow outline around creatures that will survive
+                if hasattr(creature, 'will_survive') and creature.will_survive:
+                    # Draw a thicker, brighter yellow outline for better visibility
+                    pygame.draw.circle(screen, (255, 255, 0),  # Bright yellow
+                                       (screen_x, screen_y),
+                                       size + 3)  # Thicker outline
                 # Draw red outline around killers if that attribute exists
-                if hasattr(creature, 'has_killed') and creature.has_killed:
+                elif hasattr(creature, 'has_killed') and creature.has_killed:
                     pygame.draw.circle(screen, (255, 0, 0),
                                        (screen_x, screen_y),
                                        size + 2)
@@ -280,7 +277,7 @@ class Renderer:
             "1: Vertical bar in center",
             "2: Vertical bar in random location",
             "3: Five staggered blocks",
-            f"Current barrier type: {self.params.get('barrierType', 0)}",
+            f"Current barrier type: {self.params.get('barrier_type', 0)}",
             "",
             "Generation Control:",
             "G: Force new generation (when paused)",
@@ -347,14 +344,16 @@ class Renderer:
             True, (255, 255, 255))
         self.world.blit(info_text, (10, 10))
         
-        # Count creatures in safe zones
-        safe_count = sum(1 for c in creatures if c.in_safe_zone)
-        # Show safe zone status
-        safe_percentage = safe_count / len(creatures) * 100 if creatures else 0
-        safe_text = self.font.render(
-            f"Safe Zones: {safe_count}/{len(creatures)} ({safe_percentage:.1f}%)",
-            True, (0, 255, 0))
-        self.world.blit(safe_text, (10, 35))
+        # Count creatures in safe zones and show status only for challenges that use safe zones
+        challenge_type = self.params.get('challenge', None)
+        if challenge_type is not None and challenge_type not in [15]:  # Don't show for CHALLENGE_PAIRS
+            safe_count = sum(1 for c in creatures if c.in_safe_zone)
+            # Show safe zone status
+            safe_percentage = safe_count / len(creatures) * 100 if creatures else 0
+            safe_text = self.font.render(
+                f"Safe Zones: {safe_count}/{len(creatures)} ({safe_percentage:.1f}%)",
+                True, (0, 255, 0))
+            self.world.blit(safe_text, (10, 35))
         
         # Display challenge name and highlighting status
         if challenge_type is not None:
