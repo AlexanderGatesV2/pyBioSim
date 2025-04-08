@@ -49,6 +49,7 @@ DEFAULT_PARAMS = {
     'sexual_reproduction': True,  # Match C++ sexualReproduction
     'choose_parents_by_fitness': True,  # Match C++ chooseParentsByFitness
     'kill_enable': False,  # Match C++ killEnable
+    'background_color': [255, 255, 255],  # RGB values for simulation background color (white)
 }
 
 

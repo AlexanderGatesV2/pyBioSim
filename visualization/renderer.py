@@ -271,6 +271,8 @@ class Renderer:
             f"Direction lines: {'ON' if self.params.get('show_direction_lines', True) else 'OFF'}",
             "K: Toggle kill counter",
             f"Kill counter: {'ON' if self.show_kill_counter else 'OFF'}",
+            "B: Cycle background colors",
+            f"Background: {tuple(self.params.get('background_color', [255, 255, 255]))}",
             "",
             "Barrier Types:",
             "0: No barriers",
@@ -313,7 +315,10 @@ class Renderer:
         grid_width = grid.size[0] * self.display_scale
         grid_height = grid.size[1] * self.display_scale
         grid_surface = pygame.Surface((grid_width, grid_height))
-        grid_surface.fill((0, 0, 0))  # Black background for grid
+        
+        # Use background color from params or default to white
+        bg_color = self.params.get('background_color', [255, 255, 255])
+        grid_surface.fill(tuple(bg_color))  # Background for grid
         
         # Render challenge area if a challenge is selected and highlighting is enabled
         challenge_type = self.params.get('challenge', None)
@@ -436,6 +441,24 @@ class Renderer:
                 # Barrier type keys (0-3) - these need to be handled by the simulator
                 # We'll just store the key event and let the simulator handle it
                 # The simulator will call barrier_manager.create_barriers
+                
+                # Background color toggle
+                elif event.key == pygame.K_b:
+                    # Cycle through a few predefined colors
+                    current_color = tuple(self.params.get('background_color', [255, 255, 255]))
+                    if current_color == (255, 255, 255):  # White
+                        self.params['background_color'] = [0, 0, 0]  # Black
+                    elif current_color == (0, 0, 0):  # Black
+                        self.params['background_color'] = [20, 20, 50]  # Dark blue
+                    elif current_color == (20, 20, 50):  # Dark blue
+                        self.params['background_color'] = [20, 50, 20]  # Dark green
+                    elif current_color == (20, 50, 20):  # Dark green
+                        self.params['background_color'] = [50, 20, 20]  # Dark red
+                    elif current_color == (50, 20, 20):  # Dark red
+                        self.params['background_color'] = [40, 40, 40]  # Dark gray
+                    else:
+                        self.params['background_color'] = [255, 255, 255]  # Back to white
+                    print(f"Background color changed to: {self.params['background_color']}")
                 
                 # Simulation speed controls
                 elif event.key == pygame.K_MINUS or event.key == pygame.K_KP_MINUS:
